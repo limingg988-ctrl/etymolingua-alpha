@@ -1,0 +1,7 @@
+{
+  "name": "EtymoLingua - デジタル英語辞典",
+  "description": "英単語の意味を聞くと、語源や覚え方、すっとなぜその意味なのか頭に入る説明を提供するAI単語帳アプリ。",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
