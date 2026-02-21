@@ -1,6 +1,13 @@
-import React from 'react';
+import React from "react";
 
-type ViewMode = 'search' | 'list' | 'chat' | 'notebook' | 'thesaurus' | 'quiz' | 'trash';
+type ViewMode =
+  | "search"
+  | "list"
+  | "chat"
+  | "notebook"
+  | "thesaurus"
+  | "quiz"
+  | "trash";
 
 interface HeaderProps {
   currentView: ViewMode;
@@ -9,36 +16,49 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenBooks: () => void;
   currentBookName: string;
-  user: any;           // 追加: ユーザー情報
+  user: any; // 追加: ユーザー情報
   onLogin: () => void; // 追加: ログインボタン用
-  onLogout: () => void;// 追加: ログアウトボタン用
+  onLogout: () => void; // 追加: ログアウトボタン用
+  onRepairBooks?: () => void; // 単語帳修復ボタン
 }
 
-export const Header: React.FC<HeaderProps> = ({ 
-  currentView, onChangeView, onOpenUsage, onOpenSettings, onOpenBooks, currentBookName,
-  user, onLogin, onLogout
+export const Header: React.FC<HeaderProps> = ({
+  currentView,
+  onChangeView,
+  onOpenUsage,
+  onOpenSettings,
+  onOpenBooks,
+  currentBookName,
+  user,
+  onLogin,
+  onLogout,
+  onRepairBooks,
 }) => {
-  const getButtonClass = (view: ViewMode) => `px-4 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${
-    currentView === view 
-      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
-      : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
-  }`;
+  const getButtonClass = (view: ViewMode) =>
+    `px-4 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${
+      currentView === view
+        ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+        : "text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
+    }`;
 
   return (
     <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 transition-all">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        
         {/* Logo & Book Switcher */}
         <div className="flex items-center gap-2 sm:gap-4">
-          <button 
-            onClick={() => onChangeView('search')}
+          <button
+            onClick={() => onChangeView("search")}
             className="flex items-center gap-2 hover:opacity-80 transition-opacity focus:outline-none"
           >
             <div className="bg-indigo-600 p-2 rounded-lg shadow-md shadow-indigo-200 hidden sm:block">
               <i className="fa-solid fa-book-sparkles text-white text-xl"></i>
             </div>
-            <span className="font-black text-slate-800 text-lg hidden sm:block tracking-tight">EtymoLingua</span>
-            <span className="font-black text-indigo-600 text-xl sm:hidden"><i className="fa-solid fa-book-sparkles"></i></span>
+            <span className="font-black text-slate-800 text-lg hidden sm:block tracking-tight">
+              Etymolingua-alpha
+            </span>
+            <span className="font-black text-indigo-600 text-xl sm:hidden">
+              <i className="fa-solid fa-book-sparkles"></i>
+            </span>
           </button>
 
           {/* Book Switcher */}
@@ -54,22 +74,37 @@ export const Header: React.FC<HeaderProps> = ({
             <i className="fa-solid fa-chevron-down text-xs text-slate-400 group-hover:text-indigo-400"></i>
           </button>
         </div>
-        
+
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
-          <button onClick={() => onChangeView('search')} className={getButtonClass('search')}>
+          <button
+            onClick={() => onChangeView("search")}
+            className={getButtonClass("search")}
+          >
             <i className="fa-solid fa-magnifying-glass"></i>辞典
           </button>
-          <button onClick={() => onChangeView('list')} className={getButtonClass('list')}>
+          <button
+            onClick={() => onChangeView("list")}
+            className={getButtonClass("list")}
+          >
             <i className="fa-solid fa-list-ul"></i>リスト
           </button>
-          <button onClick={() => onChangeView('quiz')} className={getButtonClass('quiz')}>
+          <button
+            onClick={() => onChangeView("quiz")}
+            className={getButtonClass("quiz")}
+          >
             <i className="fa-solid fa-layer-group"></i>クイズ
           </button>
-          <button onClick={() => onChangeView('chat')} className={getButtonClass('chat')}>
+          <button
+            onClick={() => onChangeView("chat")}
+            className={getButtonClass("chat")}
+          >
             <i className="fa-solid fa-comments"></i>AI会話
           </button>
-          <button onClick={() => onChangeView('notebook')} className={getButtonClass('notebook')}>
+          <button
+            onClick={() => onChangeView("notebook")}
+            className={getButtonClass("notebook")}
+          >
             <i className="fa-solid fa-book-bookmark"></i>ノート
           </button>
         </nav>
@@ -80,14 +115,18 @@ export const Header: React.FC<HeaderProps> = ({
           {user ? (
             <div className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
               {user.photoURL ? (
-                <img src={user.photoURL} alt="User" className="w-6 h-6 rounded-full" />
+                <img
+                  src={user.photoURL}
+                  alt="User"
+                  className="w-6 h-6 rounded-full"
+                />
               ) : (
                 <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
-                  {user.email?.[0]?.toUpperCase() || 'U'}
+                  {user.email?.[0]?.toUpperCase() || "U"}
                 </div>
               )}
-              <button 
-                onClick={onLogout} 
+              <button
+                onClick={onLogout}
                 className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors"
                 title="ログアウト"
               >
@@ -95,7 +134,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </div>
           ) : (
-            <button 
+            <button
               onClick={onLogin}
               className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md hover:bg-indigo-700 transition-colors flex items-center gap-1 whitespace-nowrap"
             >
@@ -105,7 +144,15 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block"></div>
 
-          <button 
+          <button
+            onClick={onRepairBooks}
+            className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-amber-600 transition-colors rounded-full hover:bg-slate-100"
+            title="欠損単語帳を修復する"
+          >
+            <i className="fa-solid fa-wrench"></i>
+          </button>
+
+          <button
             onClick={onOpenSettings}
             className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors rounded-full hover:bg-slate-100"
             title="設定"
@@ -114,26 +161,41 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
       </div>
-      
+
       {/* Mobile Nav */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-50 pb-safe overflow-x-auto shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <button onClick={() => onChangeView('search')} className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === 'search' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400'}`}>
+        <button
+          onClick={() => onChangeView("search")}
+          className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === "search" ? "text-indigo-600 bg-indigo-50" : "text-slate-400"}`}
+        >
           <i className="fa-solid fa-magnifying-glass text-lg mb-1"></i>
           <span className="text-[10px] font-bold">辞典</span>
         </button>
-        <button onClick={() => onChangeView('list')} className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === 'list' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400'}`}>
+        <button
+          onClick={() => onChangeView("list")}
+          className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === "list" ? "text-indigo-600 bg-indigo-50" : "text-slate-400"}`}
+        >
           <i className="fa-solid fa-list-ul text-lg mb-1"></i>
           <span className="text-[10px] font-bold">単語帳</span>
         </button>
-        <button onClick={() => onChangeView('quiz')} className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === 'quiz' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400'}`}>
+        <button
+          onClick={() => onChangeView("quiz")}
+          className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === "quiz" ? "text-indigo-600 bg-indigo-50" : "text-slate-400"}`}
+        >
           <i className="fa-solid fa-layer-group text-lg mb-1"></i>
           <span className="text-[10px] font-bold">クイズ</span>
         </button>
-        <button onClick={() => onChangeView('chat')} className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === 'chat' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400'}`}>
+        <button
+          onClick={() => onChangeView("chat")}
+          className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === "chat" ? "text-indigo-600 bg-indigo-50" : "text-slate-400"}`}
+        >
           <i className="fa-solid fa-comments text-lg mb-1"></i>
           <span className="text-[10px] font-bold">AI会話</span>
         </button>
-        <button onClick={() => onChangeView('trash')} className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === 'trash' ? 'text-red-500 bg-red-50' : 'text-slate-400'}`}>
+        <button
+          onClick={() => onChangeView("trash")}
+          className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === "trash" ? "text-red-500 bg-red-50" : "text-slate-400"}`}
+        >
           <i className="fa-solid fa-trash-can text-lg mb-1"></i>
           <span className="text-[10px] font-bold">ゴミ箱</span>
         </button>

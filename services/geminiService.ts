@@ -1,6 +1,19 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GeminiResponse, ChatMessage, NoteEntry, WordEntry } from "../types";
 
+/** 英和・英英・多言語の説明モード */
+export type ExplainMode = "en-ja" | "en-en" | "multilingual";
+
+/** モードごとのAIへの専用命令（ベースの後に付与） */
+const EXPLAIN_MODE_SUFFIXES: Record<ExplainMode, string> = {
+  "en-ja":
+    "※ 出力言語: 日本語で語源を交えて説明してください。meaning, etymology, mnemonic, logic, exampleSentenceTranslation および synonyms/collocations/idioms/relatedWords の translation は全て日本語で記述してください。",
+  "en-en":
+    "※ Output language: Explain everything in simple English. All text fields (meaning, etymology, mnemonic, logic, exampleSentenceTranslation, and synonyms/collocations/idioms/relatedWords.translation) must be in English.",
+  multilingual:
+    "※ Output language: Use simple English as the primary language. You may add brief Japanese notes (in parentheses) for key etymology or memory hints when helpful.",
+};
+
 const getAI = () => {
   // Use process.env.API_KEY exclusively as per guidelines
   // Do not use localStorage or UI input for API key.
@@ -51,14 +64,8 @@ const handleApiError = (error: any) => {
   throw new Error(`AIエラー: ${error.message || "不明なエラーが発生しました"}`);
 };
 
-export const fetchWordDetails = async (word: string): Promise<GeminiResponse> => {
-  const ai = getAI();
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `英単語または熟語「${word}」について、語源や構成、覚え方、すっとなぜその意味なのか頭に入る説明を考え、詳細に解説してください。`,
-      config: {
-        systemInstruction: `あなたは世界一わかりやすい英語講師です。
+/** ベースとなる共通のシステム命令（モードに依存しない部分） */
+const BASE_SYSTEM_INSTRUCTION = `あなたは世界一わかりやすい英語講師です。
   ユーザーが入力した「英単語」または「熟語」について、以下の3点を軸に、**「なるほど！だからこういう意味になるのか！」と膝を打つような（アハ体験ができる）解説**を作成してください。
   
   1. **語源・コアイメージ**: 単語をパーツ（接頭辞・語根・接尾辞）に分解し、それぞれの原義を可視化できるように説明する。熟語の場合は前置詞の持つ空間的イメージを強調する。
