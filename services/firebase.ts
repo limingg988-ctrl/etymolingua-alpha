@@ -20,13 +20,13 @@ import {
 } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBNzWg03LkWuUCawaYbSUssshH0S06zGDQ",
-  authDomain: "etymolingua-61e6d.firebaseapp.com",
-  projectId: "etymolingua-61e6d",
-  storageBucket: "etymolingua-61e6d.firebasestorage.app",
-  messagingSenderId: "483566326389",
-  appId: "1:483566326389:web:7d8afbe3dc981bf24d1e3c",
-  measurementId: "G-2NKN7JKTBY"
+  apiKey: "AIzaSyDm1Vxi_N-FL--8OcbMplogaW27W9XpHpE",
+  authDomain: "etymolingua-beta-ac64b.firebaseapp.com",
+  projectId: "etymolingua-beta-ac64b",
+  storageBucket: "etymolingua-beta-ac64b.firebasestorage.app",
+  messagingSenderId: "747374309813",
+  appId: "1:747374309813:web:c6407abf014850be53e9fc",
+  measurementId: "G-L07GNWTG6X"
 };
 
 const app = initializeApp(firebaseConfig);
