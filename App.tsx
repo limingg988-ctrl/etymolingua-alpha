@@ -8,6 +8,8 @@ import { SettingsModal } from "./components/SettingsModal";
 import { BookListModal } from "./components/BookListModal";
 import { QuizView } from "./components/QuizView";
 import { TrashView } from "./components/TrashView";
+import { ThesaurusView } from "./components/ThesaurusView";
+import { UsageGuide } from "./components/UsageGuide";
 import { Toast } from "./components/Toast";
 import { SkeletonLoader } from "./components/SkeletonLoader";
 import { LoginConfirmModal } from "./components/LoginConfirmModal";
@@ -18,23 +20,35 @@ import {
   GeminiResponse,
   WordStatus,
 } from "./types";
-import { fetchWordDetails } from "./services/geminiService";
+import { fetchWordDetails, SearchFocus } from "./services/geminiService";
 import { dbService, auth, loginWithGoogle, logout } from "./services/firebase";
+import { exportToJSON } from "./services/csvExportService";
 import { onAuthStateChanged } from "firebase/auth";
+
+type ViewMode =
+  | "search"
+  | "list"
+  | "chat"
+  | "notebook"
+  | "thesaurus"
+  | "quiz"
+  | "trash";
 
 const App: React.FC = () => {
   const [isGlobalLoading, setIsGlobalLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<any>("search");
+  const [currentView, setCurrentView] = useState<ViewMode>("search");
   const [user, setUser] = useState<any>(null);
   const [words, setWords] = useState<WordEntry[]>([]);
   const [books, setBooks] = useState<BookMetadata[]>([]);
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [currentBookId, setCurrentBookId] = useState<string>("default");
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResult, setSearchResult] = useState<GeminiResponse | null>(null);
+  const [searchResults, setSearchResults] = useState<GeminiResponse[]>([]);
+  const [searchFocus, setSearchFocus] = useState<SearchFocus>("all");
   const [isSearching, setIsSearching] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showBooks, setShowBooks] = useState(false);
+  const [showUsage, setShowUsage] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [quizTargetWords, setQuizTargetWords] = useState<WordEntry[]>([]);
   const [toast, setToast] = useState({
@@ -86,9 +100,166 @@ const App: React.FC = () => {
     setWords((prev) => [newWord, ...prev]);
     await dbService.addWord(newWord);
     showToast(`「${newWord.word}」を保存しました`, "success");
-    setSearchResult(null);
+    setSearchResults([]);
     setSearchQuery("");
   };
+
+  const parseSearchQueries = useCallback((raw: string) => {
+    const normalized = raw.replace(/、/g, ",").replace(/\n/g, ",").replace(/;/g, ",");
+    return normalized
+      .split(",")
+      .map((q) => q.trim())
+      .filter(Boolean);
+  }, []);
+
+  const handleSearchWord = useCallback(
+    async (word: string) => {
+      const query = word.trim();
+      if (!query) return;
+      setCurrentView("search");
+      setSearchQuery(query);
+      setIsSearching(true);
+      try {
+        const result = await fetchWordDetails(query, { focus: searchFocus });
+        setSearchResults([result]);
+      } catch (err: any) {
+        showToast(err.message || "検索に失敗しました", "error");
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [searchFocus, showToast],
+  );
+
+  const handleSearchSubmit = useCallback(async () => {
+    const queries = parseSearchQueries(searchQuery);
+    if (queries.length === 0) return;
+
+    setIsSearching(true);
+    setSearchResults([]);
+
+    const results: GeminiResponse[] = [];
+    for (const query of queries) {
+      try {
+        const result = await fetchWordDetails(query, { focus: searchFocus });
+        results.push(result);
+      } catch (err: any) {
+        showToast(`「${query}」: ${err.message || "検索に失敗しました"}`, "error");
+      }
+    }
+    setSearchResults(results);
+    setIsSearching(false);
+  }, [parseSearchQueries, searchFocus, searchQuery, showToast]);
+
+  const handleMoveWordToTrash = useCallback(
+    async (id: string) => {
+      setWords((prev) =>
+        prev.map((w) => (w.id === id ? { ...w, isTrashed: true } : w)),
+      );
+      await dbService.deleteWord(id);
+      showToast("単語をゴミ箱に移動しました", "info");
+    },
+    [showToast],
+  );
+
+  const handleRestoreWord = useCallback(
+    async (id: string) => {
+      setWords((prev) =>
+        prev.map((w) => (w.id === id ? { ...w, isTrashed: false } : w)),
+      );
+      await dbService.restoreWord(id);
+      showToast("単語を復元しました", "success");
+    },
+    [showToast],
+  );
+
+  const handlePermanentDeleteWord = useCallback(
+    async (id: string) => {
+      setWords((prev) => prev.filter((w) => w.id !== id));
+      await dbService.permanentDeleteWord(id);
+      showToast("単語を完全削除しました", "success");
+    },
+    [showToast],
+  );
+
+  const handleEmptyTrash = useCallback(async () => {
+    const targetIds = words.filter((w) => w.isTrashed).map((w) => w.id);
+    if (targetIds.length === 0) return;
+    setWords((prev) => prev.filter((w) => !w.isTrashed));
+    await Promise.all(targetIds.map((id) => dbService.permanentDeleteWord(id)));
+    showToast("ゴミ箱を空にしました", "success");
+  }, [words, showToast]);
+
+  const handleSaveNote = useCallback(
+    async (title: string, content: string, tags: string[]) => {
+      const note: NoteEntry = {
+        id: crypto.randomUUID(),
+        userId: user?.uid || "guest",
+        title,
+        content,
+        tags,
+        timestamp: Date.now(),
+      };
+      setNotes((prev) => [note, ...prev]);
+      await dbService.addNote(note);
+      showToast("ノートに保存しました", "success");
+    },
+    [user, showToast],
+  );
+
+  const handleDeleteNote = useCallback(
+    async (id: string) => {
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+      await dbService.permanentDeleteNote(id);
+      showToast("ノートを削除しました", "info");
+    },
+    [showToast],
+  );
+
+  const handleImportJSON = useCallback(
+    async (file: File) => {
+      try {
+        const text = await file.text();
+        const raw = JSON.parse(text);
+
+        const importedWords: WordEntry[] = Array.isArray(raw)
+          ? raw
+          : Array.isArray(raw.words)
+            ? raw.words
+            : [];
+        const importedBooks: BookMetadata[] = Array.isArray(raw.books)
+          ? raw.books
+          : [];
+
+        if (importedWords.length === 0) {
+          showToast("インポート対象の単語が見つかりませんでした", "warning");
+          return;
+        }
+
+        const normalizedWords = importedWords.map((w) => ({
+          ...w,
+          id: w.id || crypto.randomUUID(),
+          userId: user?.uid || "guest",
+          timestamp: w.timestamp || Date.now(),
+          status: w.status || "unknown",
+          isTrashed: !!w.isTrashed,
+        }));
+        const normalizedBooks = importedBooks.map((b: any) => ({
+          ...b,
+          userId: user?.uid || "guest",
+        }));
+
+        await dbService.saveWordsBatch(normalizedWords);
+        await Promise.all(normalizedBooks.map((book: any) => dbService.addBook(book)));
+
+        await loadData();
+        showToast(`インポート完了: ${normalizedWords.length} 語`, "success");
+      } catch (error) {
+        showToast("JSONの読み込みに失敗しました", "error");
+      }
+    },
+    [loadData, showToast, user],
+  );
 
   // 強化された単語フィルタリング: 単語帳が見つからない場合は全表示にフォールバック
   const activeWords = useMemo(() => {
@@ -241,7 +412,7 @@ const App: React.FC = () => {
       <Header
         currentView={currentView}
         onChangeView={setCurrentView}
-        onOpenUsage={() => {}}
+        onOpenUsage={() => setShowUsage(true)}
         onOpenSettings={() => setShowSettings(true)}
         onOpenBooks={() => setShowBooks(true)}
         currentBookName={currentBookName}
@@ -256,13 +427,7 @@ const App: React.FC = () => {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (searchQuery.trim()) {
-                  setIsSearching(true);
-                  fetchWordDetails(searchQuery)
-                    .then(setSearchResult)
-                    .catch((err) => showToast(err.message, "error"))
-                    .finally(() => setIsSearching(false));
-                }
+                handleSearchSubmit();
               }}
               className="flex gap-2"
             >
@@ -280,28 +445,65 @@ const App: React.FC = () => {
                 検索
               </button>
             </form>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-slate-500 font-bold">検索モード:</span>
+              {([
+                { key: "all", label: "すべて" },
+                { key: "idioms", label: "idiom重視" },
+                { key: "etymology", label: "語源重視" },
+                { key: "core", label: "要点のみ" },
+              ] as { key: SearchFocus; label: string }[]).map((mode) => (
+                <button
+                  key={mode.key}
+                  type="button"
+                  onClick={() => setSearchFocus(mode.key)}
+                  className={`px-3 py-1.5 rounded-full border font-bold transition-colors ${
+                    searchFocus === mode.key
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500">
+              複数検索は「, / 改行 / ;」区切りで入力できます（例: take off, resilience, look up）。「/」を含む語は1語として扱います。
+            </p>
             {isSearching && <SkeletonLoader />}
-            {searchResult && (
-              <WordCard
-                word={
-                  {
-                    ...searchResult,
-                    id: "temp",
-                    status: "unknown",
-                    timestamp: Date.now(),
-                  } as any
-                }
-              />
-            )}
-            {searchResult && (
+            {searchResults.map((result, idx) => (
+              <div key={`${result.word}-${idx}`} className="space-y-2">
+                <WordCard
+                  word={
+                    {
+                      ...result,
+                      id: `temp-${idx}`,
+                      status: "unknown",
+                      timestamp: Date.now(),
+                    } as any
+                  }
+                />
+                <button
+                  onClick={() => handleAddWord(result)}
+                  className="w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold shadow-lg"
+                >
+                  「{result.word}」を単語帳に追加
+                </button>
+              </div>
+            ))}
+            {searchResults.length > 1 && (
               <button
-                onClick={() => handleAddWord(searchResult)}
-                className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg"
+                onClick={async () => {
+                  for (const result of searchResults) {
+                    await handleAddWord(result);
+                  }
+                }}
+                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg"
               >
-                単語帳に追加
+                表示中の {searchResults.length} 語をまとめて追加
               </button>
             )}
-            {!searchResult && !isSearching && (
+            {searchResults.length === 0 && !isSearching && (
               <StatsDashboard
                 history={activeWords}
                 onStartDailyQuiz={(w) => {
@@ -318,12 +520,23 @@ const App: React.FC = () => {
               <WordCard
                 key={w.id}
                 word={w}
+                onDelete={handleMoveWordToTrash}
+                onSearchRelated={handleSearchWord}
                 onStatusChange={(id, status) =>
                   dbService.updateWord(id, { status })
                 }
               />
             ))}
           </div>
+        )}
+        {currentView === "chat" && (
+          <ChatAssistant onSaveNote={handleSaveNote} wordHistory={activeWords} />
+        )}
+        {currentView === "notebook" && (
+          <SmartNotebook notes={notes} onDeleteNote={handleDeleteNote} />
+        )}
+        {currentView === "thesaurus" && (
+          <ThesaurusView history={activeWords} onSearch={handleSearchWord} />
         )}
         {currentView === "quiz" && (
           <QuizView
@@ -333,7 +546,27 @@ const App: React.FC = () => {
             preselectedWords={quizTargetWords}
           />
         )}
+        {currentView === "trash" && (
+          <TrashView
+            trashHistory={words.filter((w) => w.isTrashed)}
+            onRestore={handleRestoreWord}
+            onDeletePermanently={handlePermanentDeleteWord}
+            onEmptyTrash={handleEmptyTrash}
+            onClose={() => setCurrentView("list")}
+          />
+        )}
       </main>
+
+      <UsageGuide isOpen={showUsage} onClose={() => setShowUsage(false)} />
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onExportJSON={() => exportToJSON(words.filter((w) => !w.isTrashed))}
+        onImportJSON={handleImportJSON}
+        wordCount={activeWords.length}
+      />
+
       <BookListModal
         isOpen={showBooks}
         onClose={() => setShowBooks(false)}
