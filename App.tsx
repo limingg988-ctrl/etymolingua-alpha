@@ -65,6 +65,9 @@ const App: React.FC = () => {
     if (error?.code === "permission-denied") {
       return "保存に失敗しました（権限不足）。ログイン状態とFirebaseプロジェクト設定を確認してください。";
     }
+    if (error?.message === "auth-required") {
+      return "保存にはログインが必要です。ログイン後にもう一度お試しください。";
+    }
     return error?.message || "操作に失敗しました";
   }, []);
 
