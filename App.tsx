@@ -61,6 +61,25 @@ const App: React.FC = () => {
     setToast({ message, type, isVisible: true });
   }, []);
 
+  const getFirebaseErrorMessage = useCallback((error: any) => {
+    if (error?.code === "permission-denied") {
+      return "保存に失敗しました（権限不足）。ログイン状態とFirebaseプロジェクト設定を確認してください。";
+    }
+    if (error?.message === "auth-required") {
+      return "保存にはログインが必要です。ログイン後にもう一度お試しください。";
+    }
+    return error?.message || "操作に失敗しました";
+  }, []);
+
+  const ensureWritableSession = useCallback(() => {
+    if (!user) {
+      setShowLogin(true);
+      showToast("保存にはログインが必要です", "warning");
+      return false;
+    }
+    return true;
+  }, [user, showToast]);
+
   const loadData = useCallback(async () => {
     const data = await dbService.loadAll();
     setWords(data.words.sort((a, b) => b.timestamp - a.timestamp));
@@ -88,6 +107,7 @@ const App: React.FC = () => {
   };
 
   const handleAddWord = async (geminiData: GeminiResponse) => {
+    if (!ensureWritableSession()) return;
     const newWord: WordEntry = {
       ...geminiData,
       id: crypto.randomUUID(),
@@ -98,10 +118,22 @@ const App: React.FC = () => {
       isTrashed: false,
     };
     setWords((prev) => [newWord, ...prev]);
+<<<<<<< HEAD
+    try {
+      await dbService.addWord(newWord);
+      showToast(`「${newWord.word}」を保存しました`, "success");
+      setSearchResults([]);
+      setSearchQuery("");
+    } catch (error: any) {
+      setWords((prev) => prev.filter((w) => w.id !== newWord.id));
+      showToast(getFirebaseErrorMessage(error), "error");
+    }
+=======
     await dbService.addWord(newWord);
     showToast(`「${newWord.word}」を保存しました`, "success");
     setSearchResults([]);
     setSearchQuery("");
+>>>>>>> origin/main
   };
 
   const parseSearchQueries = useCallback((raw: string) => {
@@ -153,6 +185,23 @@ const App: React.FC = () => {
 
   const handleMoveWordToTrash = useCallback(
     async (id: string) => {
+<<<<<<< HEAD
+      if (!ensureWritableSession()) return;
+      setWords((prev) =>
+        prev.map((w) => (w.id === id ? { ...w, isTrashed: true } : w)),
+      );
+      try {
+        await dbService.deleteWord(id);
+        showToast("単語をゴミ箱に移動しました", "info");
+      } catch (error: any) {
+        setWords((prev) =>
+          prev.map((w) => (w.id === id ? { ...w, isTrashed: false } : w)),
+        );
+        showToast(getFirebaseErrorMessage(error), "error");
+      }
+    },
+    [ensureWritableSession, getFirebaseErrorMessage, showToast],
+=======
       setWords((prev) =>
         prev.map((w) => (w.id === id ? { ...w, isTrashed: true } : w)),
       );
@@ -160,10 +209,28 @@ const App: React.FC = () => {
       showToast("単語をゴミ箱に移動しました", "info");
     },
     [showToast],
+>>>>>>> origin/main
   );
 
   const handleRestoreWord = useCallback(
     async (id: string) => {
+<<<<<<< HEAD
+      if (!ensureWritableSession()) return;
+      setWords((prev) =>
+        prev.map((w) => (w.id === id ? { ...w, isTrashed: false } : w)),
+      );
+      try {
+        await dbService.restoreWord(id);
+        showToast("単語を復元しました", "success");
+      } catch (error: any) {
+        setWords((prev) =>
+          prev.map((w) => (w.id === id ? { ...w, isTrashed: true } : w)),
+        );
+        showToast(getFirebaseErrorMessage(error), "error");
+      }
+    },
+    [ensureWritableSession, getFirebaseErrorMessage, showToast],
+=======
       setWords((prev) =>
         prev.map((w) => (w.id === id ? { ...w, isTrashed: false } : w)),
       );
@@ -171,10 +238,45 @@ const App: React.FC = () => {
       showToast("単語を復元しました", "success");
     },
     [showToast],
+>>>>>>> origin/main
   );
 
   const handlePermanentDeleteWord = useCallback(
     async (id: string) => {
+<<<<<<< HEAD
+      if (!ensureWritableSession()) return;
+      const snapshot = words;
+      setWords((prev) => prev.filter((w) => w.id !== id));
+      try {
+        await dbService.permanentDeleteWord(id);
+        showToast("単語を完全削除しました", "success");
+      } catch (error: any) {
+        setWords(snapshot);
+        showToast(getFirebaseErrorMessage(error), "error");
+      }
+    },
+    [ensureWritableSession, getFirebaseErrorMessage, showToast, words],
+  );
+
+  const handleEmptyTrash = useCallback(async () => {
+    if (!ensureWritableSession()) return;
+    const targetIds = words.filter((w) => w.isTrashed).map((w) => w.id);
+    if (targetIds.length === 0) return;
+    const snapshot = words;
+    setWords((prev) => prev.filter((w) => !w.isTrashed));
+    try {
+      await Promise.all(targetIds.map((id) => dbService.permanentDeleteWord(id)));
+      showToast("ゴミ箱を空にしました", "success");
+    } catch (error: any) {
+      setWords(snapshot);
+      showToast(getFirebaseErrorMessage(error), "error");
+    }
+  }, [ensureWritableSession, getFirebaseErrorMessage, words, showToast]);
+
+  const handleSaveNote = useCallback(
+    async (title: string, content: string, tags: string[]) => {
+      if (!ensureWritableSession()) return;
+=======
       setWords((prev) => prev.filter((w) => w.id !== id));
       await dbService.permanentDeleteWord(id);
       showToast("単語を完全削除しました", "success");
@@ -192,6 +294,7 @@ const App: React.FC = () => {
 
   const handleSaveNote = useCallback(
     async (title: string, content: string, tags: string[]) => {
+>>>>>>> origin/main
       const note: NoteEntry = {
         id: crypto.randomUUID(),
         userId: user?.uid || "guest",
@@ -201,23 +304,54 @@ const App: React.FC = () => {
         timestamp: Date.now(),
       };
       setNotes((prev) => [note, ...prev]);
+<<<<<<< HEAD
+      try {
+        await dbService.addNote(note);
+        showToast("ノートに保存しました", "success");
+      } catch (error: any) {
+        setNotes((prev) => prev.filter((n) => n.id !== note.id));
+        showToast(getFirebaseErrorMessage(error), "error");
+      }
+    },
+    [ensureWritableSession, getFirebaseErrorMessage, user, showToast],
+=======
       await dbService.addNote(note);
       showToast("ノートに保存しました", "success");
     },
     [user, showToast],
+>>>>>>> origin/main
   );
 
   const handleDeleteNote = useCallback(
     async (id: string) => {
+<<<<<<< HEAD
+      if (!ensureWritableSession()) return;
+      const snapshot = notes;
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+      try {
+        await dbService.permanentDeleteNote(id);
+        showToast("ノートを削除しました", "info");
+      } catch (error: any) {
+        setNotes(snapshot);
+        showToast(getFirebaseErrorMessage(error), "error");
+      }
+    },
+    [ensureWritableSession, getFirebaseErrorMessage, notes, showToast],
+=======
       setNotes((prev) => prev.filter((n) => n.id !== id));
       await dbService.permanentDeleteNote(id);
       showToast("ノートを削除しました", "info");
     },
     [showToast],
+>>>>>>> origin/main
   );
 
   const handleImportJSON = useCallback(
     async (file: File) => {
+<<<<<<< HEAD
+      if (!ensureWritableSession()) return;
+=======
+>>>>>>> origin/main
       try {
         const text = await file.text();
         const raw = JSON.parse(text);
@@ -255,10 +389,17 @@ const App: React.FC = () => {
         await loadData();
         showToast(`インポート完了: ${normalizedWords.length} 語`, "success");
       } catch (error) {
+<<<<<<< HEAD
+        showToast(getFirebaseErrorMessage(error), "error");
+      }
+    },
+    [ensureWritableSession, getFirebaseErrorMessage, loadData, showToast, user],
+=======
         showToast("JSONの読み込みに失敗しました", "error");
       }
     },
     [loadData, showToast, user],
+>>>>>>> origin/main
   );
 
   // 強化された単語フィルタリング: 単語帳が見つからない場合は全表示にフォールバック
@@ -314,6 +455,7 @@ const App: React.FC = () => {
   // 単語帳の作成/変更/削除ハンドラ
   const handleCreateBook = useCallback(
     async (title: string, description: string) => {
+      if (!ensureWritableSession()) return;
       const newBook = {
         id: crypto.randomUUID(),
         title,
@@ -322,26 +464,39 @@ const App: React.FC = () => {
         userId: user?.uid || "guest",
       } as any;
       setBooks((prev) => [newBook, ...prev]);
-      await dbService.addBook(newBook);
-      setCurrentBookId(newBook.id);
-      showToast("単語帳を作成しました", "success");
+      try {
+        await dbService.addBook(newBook);
+        setCurrentBookId(newBook.id);
+        showToast("単語帳を作成しました", "success");
+      } catch (error: any) {
+        setBooks((prev) => prev.filter((b) => b.id !== newBook.id));
+        showToast(getFirebaseErrorMessage(error), "error");
+      }
     },
-    [user, showToast],
+    [ensureWritableSession, getFirebaseErrorMessage, user, showToast],
   );
 
   const handleRenameBook = useCallback(
     async (id: string, newTitle: string) => {
+      if (!ensureWritableSession()) return;
+      const snapshot = books;
       setBooks((prev) =>
         prev.map((b) => (b.id === id ? { ...b, title: newTitle } : b)),
       );
-      await dbService.updateBook(id, { title: newTitle });
-      showToast("単語帳名を変更しました", "success");
+      try {
+        await dbService.updateBook(id, { title: newTitle });
+        showToast("単語帳名を変更しました", "success");
+      } catch (error: any) {
+        setBooks(snapshot);
+        showToast(getFirebaseErrorMessage(error), "error");
+      }
     },
-    [showToast],
+    [books, ensureWritableSession, getFirebaseErrorMessage, showToast],
   );
 
   const handleDeleteBook = useCallback(
     async (id: string) => {
+      if (!ensureWritableSession()) return;
       // ローカル状態を先に更新
       setBooks((prev) => prev.filter((b) => b.id !== id));
       const affected = words.filter((w) => w.bookId === id).map((w) => w.id);
@@ -355,12 +510,12 @@ const App: React.FC = () => {
         );
         showToast("単語帳と含まれる単語を削除しました", "success");
       } catch (e: any) {
-        showToast("削除中にエラーが発生しました", "error");
+        showToast(getFirebaseErrorMessage(e), "error");
       }
       // 削除後は全表示に戻す
       setCurrentBookId("all");
     },
-    [words, showToast],
+    [ensureWritableSession, getFirebaseErrorMessage, words, showToast],
   );
 
   // 欠損している bookId を参照する単語帳を自動復元（参照されている id と同じ id のプレースホルダを作成）
@@ -522,9 +677,20 @@ const App: React.FC = () => {
                 word={w}
                 onDelete={handleMoveWordToTrash}
                 onSearchRelated={handleSearchWord}
+<<<<<<< HEAD
+                onStatusChange={async (id, status) => {
+                  if (!ensureWritableSession()) return;
+                  try {
+                    await dbService.updateWord(id, { status });
+                  } catch (error: any) {
+                    showToast(getFirebaseErrorMessage(error), "error");
+                  }
+                }}
+=======
                 onStatusChange={(id, status) =>
                   dbService.updateWord(id, { status })
                 }
+>>>>>>> origin/main
               />
             ))}
           </div>
@@ -541,7 +707,14 @@ const App: React.FC = () => {
         {currentView === "quiz" && (
           <QuizView
             history={activeWords}
-            onUpdateStatus={dbService.updateWord.bind(dbService)}
+            onUpdateStatus={async (id, updates) => {
+              if (!ensureWritableSession()) return;
+              try {
+                await dbService.updateWord(id, updates);
+              } catch (error: any) {
+                showToast(getFirebaseErrorMessage(error), "error");
+              }
+            }}
             onExit={() => setCurrentView("search")}
             preselectedWords={quizTargetWords}
           />

@@ -107,6 +107,12 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <i className="fa-solid fa-book-bookmark"></i>ノート
           </button>
+          <button
+            onClick={() => onChangeView("trash")}
+            className={getButtonClass("trash")}
+          >
+            <i className="fa-solid fa-trash-can"></i>ゴミ箱
+          </button>
         </nav>
 
         {/* Right Actions & User Auth */}
@@ -150,6 +156,14 @@ export const Header: React.FC<HeaderProps> = ({
             title="欠損単語帳を修復する"
           >
             <i className="fa-solid fa-wrench"></i>
+          </button>
+
+          <button
+            onClick={onOpenUsage}
+            className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors rounded-full hover:bg-slate-100"
+            title="使い方"
+          >
+            <i className="fa-regular fa-circle-question"></i>
           </button>
 
           <button
