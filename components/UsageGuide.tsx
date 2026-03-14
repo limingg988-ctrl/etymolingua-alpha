@@ -95,6 +95,20 @@ export const UsageGuide: React.FC<UsageGuideProps> = ({ isOpen, onClose }) => {
             </div>
           </section>
 
+          <section className="flex gap-4">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-lg">6</div>
+            <div>
+              <h3 className="font-bold text-slate-800 text-lg mb-2">辞典検索の新機能（重要）</h3>
+              <p className="text-slate-600 text-sm leading-relaxed mb-3">
+                辞典タブに<strong>検索モード切替</strong>を追加しました。初期状態は「すべて」で、必要に応じて「idiom重視」「語源重視」「要点のみ」に切り替えられます。
+              </p>
+              <p className="text-slate-600 text-sm leading-relaxed">
+                さらに、複数語の一括検索に対応しました。入力欄で <code className="bg-slate-100 px-1 rounded">,</code>・改行・<code className="bg-slate-100 px-1 rounded">;</code> 区切りで複数語を入力できます（<code className="bg-slate-100 px-1 rounded">/</code> を含む語は1語として扱います）。
+              </p>
+            </div>
+          </section>
+
+
         </div>
 
         <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-3xl text-center">
