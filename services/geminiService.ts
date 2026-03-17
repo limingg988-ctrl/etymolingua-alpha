@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GeminiResponse, ChatMessage, NoteEntry, WordEntry } from "../types";
+import { AppLanguage, getLanguageInstruction } from "./i18n";
 
 /** 英和・英英・多言語の説明モード */
 export type ExplainMode = "en-ja" | "en-en" | "multilingual";
@@ -278,9 +279,10 @@ export const generateAiQuiz = async (level: string, count: number): Promise<Word
 };
 
 export const sendChatMessage = async (
-  history: ChatMessage[], 
+  history: ChatMessage[],
   newMessage: string,
-  vocabularyContext: string = ""
+  vocabularyContext: string = "",
+  responseLanguage: AppLanguage = "ja",
 ): Promise<string> => {
   const ai = getAI();
   const systemInstruction = `あなたは親切で知識豊富な英語学習アシスタントです。
@@ -296,7 +298,7 @@ export const sendChatMessage = async (
 学習済み単語リスト:
 ${vocabularyContext}
 
-必要に応じて、類義語のリストアップや例文の作成を行ってください。`;
+必要に応じて、類義語のリストアップや例文の作成を行ってください。\n\n${getLanguageInstruction(responseLanguage)}`;
 
   try {
     const chat = ai.chats.create({
@@ -311,14 +313,17 @@ ${vocabularyContext}
     });
 
     const result = await chat.sendMessage({ message: newMessage });
-    return result.text || "申し訳ありません、応答を生成できませんでした。";
+    return result.text || "Failed to generate response.";
   } catch (error) {
     handleApiError(error);
     throw error;
   }
 };
 
-export const generateNoteFromChat = async (chatHistory: ChatMessage[]): Promise<{ title: string; content: string; tags: string[] }> => {
+export const generateNoteFromChat = async (
+  chatHistory: ChatMessage[],
+  responseLanguage: AppLanguage = "ja",
+): Promise<{ title: string; content: string; tags: string[] }> => {
   const ai = getAI();
   
   const relevantHistory = chatHistory.slice(1);
@@ -340,7 +345,7 @@ export const generateNoteFromChat = async (chatHistory: ChatMessage[]): Promise<
 3. タグ: 検索しやすいキーワード（3つ〜5つ）。
 
 【会話ログ】
-${conversationText}`;
+${conversationText}\n\n${getLanguageInstruction(responseLanguage)}`;
 
   try {
     const response = await ai.models.generateContent({
