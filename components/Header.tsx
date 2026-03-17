@@ -1,4 +1,5 @@
 import React from "react";
+import { AppLanguage, getLanguageLabel, t } from "../services/i18n";
 
 type ViewMode =
   | "search"
@@ -20,6 +21,8 @@ interface HeaderProps {
   onLogin: () => void; // 追加: ログインボタン用
   onLogout: () => void; // 追加: ログアウトボタン用
   onRepairBooks?: () => void; // 単語帳修復ボタン
+  language: AppLanguage;
+  onLanguageChange: (lang: AppLanguage) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +36,8 @@ export const Header: React.FC<HeaderProps> = ({
   onLogin,
   onLogout,
   onRepairBooks,
+  language,
+  onLanguageChange,
 }) => {
   const getButtonClass = (view: ViewMode) =>
     `px-4 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${
@@ -65,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onOpenBooks}
             className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 border border-transparent hover:border-indigo-200 rounded-xl transition-all group max-w-[140px] sm:max-w-[200px]"
-            title="単語帳を切り替える"
+            title={t(language, "header.switchBook")}
           >
             <i className="fa-solid fa-book text-slate-400 group-hover:text-indigo-500"></i>
             <span className="font-bold text-slate-700 group-hover:text-indigo-700 text-xs sm:text-sm truncate">
@@ -81,37 +86,37 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onChangeView("search")}
             className={getButtonClass("search")}
           >
-            <i className="fa-solid fa-magnifying-glass"></i>辞典
+            <i className="fa-solid fa-magnifying-glass"></i>{t(language, "header.dictionary")}
           </button>
           <button
             onClick={() => onChangeView("list")}
             className={getButtonClass("list")}
           >
-            <i className="fa-solid fa-list-ul"></i>リスト
+            <i className="fa-solid fa-list-ul"></i>{t(language, "header.list")}
           </button>
           <button
             onClick={() => onChangeView("quiz")}
             className={getButtonClass("quiz")}
           >
-            <i className="fa-solid fa-layer-group"></i>クイズ
+            <i className="fa-solid fa-layer-group"></i>{t(language, "header.quiz")}
           </button>
           <button
             onClick={() => onChangeView("chat")}
             className={getButtonClass("chat")}
           >
-            <i className="fa-solid fa-comments"></i>AI会話
+            <i className="fa-solid fa-comments"></i>{t(language, "header.chat")}
           </button>
           <button
             onClick={() => onChangeView("notebook")}
             className={getButtonClass("notebook")}
           >
-            <i className="fa-solid fa-book-bookmark"></i>ノート
+            <i className="fa-solid fa-book-bookmark"></i>{t(language, "header.notebook")}
           </button>
           <button
             onClick={() => onChangeView("trash")}
             className={getButtonClass("trash")}
           >
-            <i className="fa-solid fa-trash-can"></i>ゴミ箱
+            <i className="fa-solid fa-trash-can"></i>{t(language, "header.trash")}
           </button>
         </nav>
 
@@ -134,7 +139,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onLogout}
                 className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors"
-                title="ログアウト"
+                title={t(language, "header.logout")}
               >
                 <i className="fa-solid fa-right-from-bracket"></i>
               </button>
@@ -144,10 +149,25 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onLogin}
               className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md hover:bg-indigo-700 transition-colors flex items-center gap-1 whitespace-nowrap"
             >
-              <i className="fa-regular fa-user"></i> ログイン
+              <i className="fa-regular fa-user"></i> {t(language, "header.login")}
             </button>
           )}
 
+
+          <label className="hidden sm:flex items-center gap-1 text-xs text-slate-500 font-bold">
+            <i className="fa-solid fa-language"></i>
+            <span>{t(language, "header.language")}</span>
+            <select
+              value={language}
+              onChange={(e) => onLanguageChange(e.target.value as AppLanguage)}
+              className="ml-1 border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700"
+              title={t(language, "header.language")}
+            >
+              {(['ja', 'en', 'zh-CN', 'ko'] as AppLanguage[]).map((lang) => (
+                <option key={lang} value={lang}>{getLanguageLabel(lang)}</option>
+              ))}
+            </select>
+          </label>
           <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block"></div>
 
           <button
@@ -183,35 +203,35 @@ export const Header: React.FC<HeaderProps> = ({
           className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === "search" ? "text-indigo-600 bg-indigo-50" : "text-slate-400"}`}
         >
           <i className="fa-solid fa-magnifying-glass text-lg mb-1"></i>
-          <span className="text-[10px] font-bold">辞典</span>
+          <span className="text-[10px] font-bold">{t(language, "header.dictionary")}</span>
         </button>
         <button
           onClick={() => onChangeView("list")}
           className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === "list" ? "text-indigo-600 bg-indigo-50" : "text-slate-400"}`}
         >
           <i className="fa-solid fa-list-ul text-lg mb-1"></i>
-          <span className="text-[10px] font-bold">単語帳</span>
+          <span className="text-[10px] font-bold">{t(language, "header.list")}</span>
         </button>
         <button
           onClick={() => onChangeView("quiz")}
           className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === "quiz" ? "text-indigo-600 bg-indigo-50" : "text-slate-400"}`}
         >
           <i className="fa-solid fa-layer-group text-lg mb-1"></i>
-          <span className="text-[10px] font-bold">クイズ</span>
+          <span className="text-[10px] font-bold">{t(language, "header.quiz")}</span>
         </button>
         <button
           onClick={() => onChangeView("chat")}
           className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === "chat" ? "text-indigo-600 bg-indigo-50" : "text-slate-400"}`}
         >
           <i className="fa-solid fa-comments text-lg mb-1"></i>
-          <span className="text-[10px] font-bold">AI会話</span>
+          <span className="text-[10px] font-bold">{t(language, "header.chat")}</span>
         </button>
         <button
           onClick={() => onChangeView("trash")}
           className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${currentView === "trash" ? "text-red-500 bg-red-50" : "text-slate-400"}`}
         >
           <i className="fa-solid fa-trash-can text-lg mb-1"></i>
-          <span className="text-[10px] font-bold">ゴミ箱</span>
+          <span className="text-[10px] font-bold">{t(language, "header.trash")}</span>
         </button>
       </div>
     </header>

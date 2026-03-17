@@ -2,17 +2,19 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChatMessage, WordEntry } from '../types';
 import { sendChatMessage, generateNoteFromChat } from '../services/geminiService';
+import { AppLanguage, t } from '../services/i18n';
 
 interface ChatAssistantProps {
   onSaveNote: (title: string, content: string, tags: string[]) => void;
   wordHistory: WordEntry[];
+  language: AppLanguage;
 }
 
-export const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveNote, wordHistory }) => {
+export const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveNote, wordHistory, language }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { 
       role: 'model', 
-      text: 'こんにちは！AIチューターです。\n\n【この機能の使い方】\n私と英語について会話をした後、右上の「ノートに保存」ボタンを押してください。\n\n会話の内容から、重要単語や文法ポイントをまとめた「あなただけの参考書ページ」を作成して「Smart Note」に保存します。\n\nまずは「単語帳からクイズを出して」や「この単語の類義語は？」など、何でも聞いてください！' 
+      text: t(language, 'chat.initial') 
     }
   ]);
   const [input, setInput] = useState('');
@@ -46,9 +48,10 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveNote, wordHi
     try {
       // Send chat context + new message to AI (Stateless approach)
       const responseText = await sendChatMessage(
-        messages, // Pass current history (excluding the new user msg, as helper adds it)
-        input,    // New message
-        vocabularyContext
+        messages,
+        input,
+        vocabularyContext,
+        language,
       );
       
       const modelMsg: ChatMessage = { role: 'model', text: responseText };
@@ -56,7 +59,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveNote, wordHi
 
     } catch (error) {
       console.error(error);
-      setMessages(prev => [...prev, { role: 'model', text: 'すみません、エラーが発生しました。もう一度お試しください。' }]);
+      setMessages(prev => [...prev, { role: 'model', text: t(language, 'chat.error') }]);
     } finally {
       setIsTyping(false);
     }
@@ -70,13 +73,13 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveNote, wordHi
 
     setIsSummarizing(true);
     try {
-      const summary = await generateNoteFromChat(messages);
+      const summary = await generateNoteFromChat(messages, language);
       onSaveNote(summary.title, summary.content, summary.tags);
       
       // Reset chat UI after saving
       setMessages(prev => [...prev, { 
         role: 'model', 
-        text: '✅ 会話をノートに保存しました！「Smart Note」タブで確認できます。' 
+        text: t(language, 'chat.saveDone') 
       }]);
     } catch (error) {
       console.error(error);
@@ -98,10 +101,10 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveNote, wordHi
                <div className="absolute inset-0 rounded-full border-4 border-indigo-600 border-t-transparent animate-spin"></div>
                <i className="fa-solid fa-pen-nib absolute inset-0 flex items-center justify-center text-indigo-600 text-xl"></i>
              </div>
-             <h3 className="text-xl font-bold text-slate-800 mb-2">ノートを作成中...</h3>
+             <h3 className="text-xl font-bold text-slate-800 mb-2">{t(language, "chat.creating")}</h3>
              <p className="text-sm text-slate-500">
-               会話の要点をまとめています。<br/>
-               Smart Noteに保存中...
+               {t(language, "chat.creatingSub").split("\n")[0]}<br/>
+               {t(language, "chat.creatingSub").split("\n")[1]}
              </p>
            </div>
         </div>
@@ -127,13 +130,13 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveNote, wordHi
             onClick={handleSummarize}
             disabled={isSummarizing || messages.length <= 1}
             className="bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 border border-slate-200 hover:border-emerald-200 px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed group"
-            title="会話の内容を要約して保存"
+            title={t(language, "chat.saveTitle")}
           >
             <i className="fa-solid fa-floppy-disk group-hover:scale-110 transition-transform"></i>
-            <span className="text-xs">ノートに保存</span>
+            <span className="text-xs">{t(language, "chat.saveToNote")}</span>
           </button>
           {messages.length <= 1 && (
-             <span className="text-[9px] text-slate-400 mt-1 mr-1">※会話後に有効になります</span>
+             <span className="text-[9px] text-slate-400 mt-1 mr-1">{t(language, "chat.saveHint")}</span>
           )}
         </div>
       </div>
@@ -156,7 +159,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveNote, wordHi
         {isTyping && (
            <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2">
             <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm flex gap-1 items-center">
-              <span className="text-xs text-slate-400 mr-2 font-bold">Thinking</span>
+              <span className="text-xs text-slate-400 mr-2 font-bold">{t(language, "chat.thinking")}</span>
               <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
               <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-75"></div>
               <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-150"></div>
@@ -175,7 +178,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveNote, wordHi
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="質問を入力（例: この単語で例文を作って / クイズを出して）"
+            placeholder={t(language, "chat.inputPlaceholder")}
             className="w-full pl-5 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-inner"
             disabled={isTyping || isSummarizing}
           />

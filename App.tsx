@@ -24,6 +24,7 @@ import { fetchWordDetails, SearchFocus } from "./services/geminiService";
 import { dbService, auth, loginWithGoogle, logout } from "./services/firebase";
 import { exportToJSON } from "./services/csvExportService";
 import { onAuthStateChanged } from "firebase/auth";
+import { AppLanguage, t } from "./services/i18n";
 
 type ViewMode =
   | "search"
@@ -51,6 +52,7 @@ const App: React.FC = () => {
   const [showUsage, setShowUsage] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [quizTargetWords, setQuizTargetWords] = useState<WordEntry[]>([]);
+  const [language, setLanguage] = useState<AppLanguage>(() => (localStorage.getItem("app-language") as AppLanguage) || "ja");
   const [toast, setToast] = useState({
     message: "",
     type: "info" as any,
@@ -63,22 +65,22 @@ const App: React.FC = () => {
 
   const getFirebaseErrorMessage = useCallback((error: any) => {
     if (error?.code === "permission-denied") {
-      return "保存に失敗しました（権限不足）。ログイン状態とFirebaseプロジェクト設定を確認してください。";
+      return t(language, "app.firebaseDenied");
     }
     if (error?.message === "auth-required") {
-      return "保存にはログインが必要です。ログイン後にもう一度お試しください。";
+      return t(language, "app.loginRequired");
     }
     return error?.message || "操作に失敗しました";
-  }, []);
+  }, [language]);
 
   const ensureWritableSession = useCallback(() => {
     if (!user) {
       setShowLogin(true);
-      showToast("保存にはログインが必要です", "warning");
+      showToast(t(language, "app.saveLoginRequired"), "warning");
       return false;
     }
     return true;
-  }, [user, showToast]);
+  }, [language, user, showToast]);
 
   const loadData = useCallback(async () => {
     const data = await dbService.loadAll();
@@ -88,6 +90,10 @@ const App: React.FC = () => {
     setIsGlobalLoading(false);
   }, []);
 
+
+  useEffect(() => {
+    localStorage.setItem("app-language", language);
+  }, [language]);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -148,12 +154,12 @@ const App: React.FC = () => {
         const result = await fetchWordDetails(query, { focus: searchFocus });
         setSearchResults([result]);
       } catch (err: any) {
-        showToast(err.message || "検索に失敗しました", "error");
+        showToast(err.message || t(language, "app.searchFailed"), "error");
       } finally {
         setIsSearching(false);
       }
     },
-    [searchFocus, showToast],
+    [language, searchFocus, showToast],
   );
 
   const handleSearchSubmit = useCallback(async () => {
@@ -169,12 +175,12 @@ const App: React.FC = () => {
         const result = await fetchWordDetails(query, { focus: searchFocus });
         results.push(result);
       } catch (err: any) {
-        showToast(`「${query}」: ${err.message || "検索に失敗しました"}`, "error");
+        showToast(`「${query}」: ${err.message || t(language, "app.searchFailed")}`, "error");
       }
     }
     setSearchResults(results);
     setIsSearching(false);
-  }, [parseSearchQueries, searchFocus, searchQuery, showToast]);
+  }, [language, parseSearchQueries, searchFocus, searchQuery, showToast]);
 
   const handleMoveWordToTrash = useCallback(
     async (id: string) => {
@@ -301,7 +307,7 @@ const App: React.FC = () => {
           : [];
 
         if (importedWords.length === 0) {
-          showToast("インポート対象の単語が見つかりませんでした", "warning");
+          showToast(t(language, "app.noWordsImported"), "warning");
           return;
         }
 
@@ -488,7 +494,7 @@ const App: React.FC = () => {
   }, [books, words, user, showToast]);
 
   if (isGlobalLoading)
-    return <div className="p-20 text-center">読み込み中...</div>;
+    return <div className="p-20 text-center">{t(language, "app.loading")}</div>;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -503,6 +509,8 @@ const App: React.FC = () => {
         user={user}
         onLogin={() => setShowLogin(true)}
         onLogout={() => logout()}
+        language={language}
+        onLanguageChange={setLanguage}
       />
       <main className="max-w-4xl mx-auto p-4">
         {currentView === "search" && (
@@ -518,18 +526,18 @@ const App: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="英単語を入力..."
+                placeholder={t(language, "app.searchPlaceholder")}
                 className="flex-1 p-4 rounded-2xl border-2 focus:border-indigo-500 outline-none"
               />
               <button
                 type="submit"
                 className="bg-indigo-600 text-white px-6 rounded-2xl font-bold"
               >
-                検索
+                {t(language, "app.search")}
               </button>
             </form>
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-slate-500 font-bold">検索モード:</span>
+              <span className="text-slate-500 font-bold">{t(language, "app.searchMode")}</span>
               {([
                 { key: "all", label: "すべて" },
                 { key: "idioms", label: "idiom重視" },
@@ -570,7 +578,7 @@ const App: React.FC = () => {
                   onClick={() => handleAddWord(result)}
                   className="w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold shadow-lg"
                 >
-                  「{result.word}」を単語帳に追加
+                  {t(language, "app.addWord", { word: result.word })}
                 </button>
               </div>
             ))}
@@ -583,7 +591,7 @@ const App: React.FC = () => {
                 }}
                 className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg"
               >
-                表示中の {searchResults.length} 語をまとめて追加
+                {t(language, "app.addAll", { count: searchResults.length })}
               </button>
             )}
             {searchResults.length === 0 && !isSearching && (
@@ -618,7 +626,7 @@ const App: React.FC = () => {
           </div>
         )}
         {currentView === "chat" && (
-          <ChatAssistant onSaveNote={handleSaveNote} wordHistory={activeWords} />
+          <ChatAssistant onSaveNote={handleSaveNote} wordHistory={activeWords} language={language} />
         )}
         {currentView === "notebook" && (
           <SmartNotebook notes={notes} onDeleteNote={handleDeleteNote} />
@@ -629,16 +637,18 @@ const App: React.FC = () => {
         {currentView === "quiz" && (
           <QuizView
             history={activeWords}
-            onUpdateStatus={async (id, updates) => {
+            onUpdateStatus={async (id, status, srsUpdates) => {
               if (!ensureWritableSession()) return;
               try {
-                await dbService.updateWord(id, updates);
+                await dbService.updateWord(id, { status, ...(srsUpdates || {}) });
               } catch (error: any) {
                 showToast(getFirebaseErrorMessage(error), "error");
               }
             }}
             onExit={() => setCurrentView("search")}
             preselectedWords={quizTargetWords}
+            onLookupWord={handleSearchWord}
+            language={language}
           />
         )}
         {currentView === "trash" && (

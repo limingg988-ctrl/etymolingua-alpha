@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { WordEntry, WordStatus } from '../types';
+import { AppLanguage, t } from '../services/i18n';
 import { generateAiQuiz } from '../services/geminiService';
 import { calculateSRS, isDueForReview } from '../services/srsService';
 
@@ -8,6 +9,8 @@ interface QuizViewProps {
   onUpdateStatus: (id: string, status: WordStatus, srsUpdates?: Partial<WordEntry>) => void;
   onExit: () => void;
   preselectedWords?: WordEntry[]; // New prop for specific quiz targets
+  onLookupWord?: (word: string) => void;
+  language: AppLanguage;
 }
 
 type QuizMode = 'flashcard' | 'choice' | 'typing' | 'ai_challenge' | 'srs_review';
@@ -47,7 +50,7 @@ const playSound = (type: 'correct' | 'incorrect') => {
   }
 };
 
-export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onExit, preselectedWords }) => {
+export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onExit, preselectedWords, onLookupWord, language }) => {
   const [step, setStep] = useState<'setup' | 'loading' | 'quiz' | 'result'>('setup');
   const [mode, setMode] = useState<QuizMode>('flashcard');
   const [selectedModes, setSelectedModes] = useState<WordStatus[]>(['unknown', 'learning']);
@@ -637,7 +640,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
                   <p className="text-slate-400 text-sm font-bold uppercase mb-4 tracking-widest">Question</p>
                   <h3 className="text-4xl font-extrabold text-slate-900 mb-2">{currentWord.word}</h3>
                   <p className="text-slate-400 mt-8 text-sm animate-pulse">
-                    <i className="fa-solid fa-arrow-rotate-right mr-2"></i>タップして答えを表示
+                    <i className="fa-solid fa-arrow-rotate-right mr-2"></i>{t(language, "quiz.tapToFlip")}
                   </p>
                 </div>
               )}
@@ -757,7 +760,18 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
 
                   <h3 className="text-3xl font-extrabold text-slate-900 mb-1">{currentWord.word}</h3>
                   <span className="text-sm font-mono text-slate-400 mb-4">{currentWord.pronunciation}</span>
-                  <p className="text-xl font-bold text-indigo-600 mb-6">{currentWord.meaning}</p>
+                  <p className="text-xl font-bold text-indigo-600 mb-4">{currentWord.meaning}</p>
+
+                  {isAiMode && onLookupWord && (
+                    <button
+                      onClick={() => onLookupWord(currentWord.word)}
+                      className="mb-5 px-4 py-2 rounded-xl bg-indigo-100 text-indigo-700 font-bold text-sm hover:bg-indigo-200 transition-colors"
+                      title={t(language, "quiz.lookupHint")}
+                    >
+                      <i className="fa-solid fa-magnifying-glass mr-2"></i>
+                      {t(language, "quiz.lookupWord")}
+                    </button>
+                  )}
                   
                   <div className="bg-slate-50 p-4 rounded-xl text-left w-full mb-4">
                     <p className="text-xs text-slate-500 font-bold mb-1"><i className="fa-solid fa-lightbulb text-amber-500 mr-1"></i>覚え方</p>
@@ -808,7 +822,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
                      onClick={handleNext}
                      className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
                    >
-                     次の問題へ <i className="fa-solid fa-arrow-right"></i>
+                     {t(language, "quiz.next")} <i className="fa-solid fa-arrow-right"></i>
                    </button>
                  )}
                </div>
