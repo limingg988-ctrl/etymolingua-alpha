@@ -9,8 +9,12 @@ import {
 } from "firebase/auth";
 import {
   initializeFirestore,
+  memoryLocalCache,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   getDocs,
+  getDocsFromCache,
   setDoc,
   doc,
   deleteDoc,
@@ -31,7 +35,18 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = initializeFirestore(app, { experimentalForceLongPolling: true });
+const supportsPersistentFirestoreCache =
+  typeof window !== "undefined" && typeof window.indexedDB !== "undefined";
+const cacheHydrationKey = (userId: string) => `firestore-cache-hydrated:${userId}`;
+
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  localCache: supportsPersistentFirestoreCache
+    ? persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      })
+    : memoryLocalCache(),
+});
 
 export const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
@@ -68,11 +83,34 @@ export const dbService = {
       const wordsQuery = query(collection(db, "words"), where("userId", "==", userId));
       const booksQuery = query(collection(db, "books"), where("userId", "==", userId));
       const notesQuery = query(collection(db, "notes"), where("userId", "==", userId));
-      const [wordsSnap, booksSnap, notesSnap] = await Promise.all([
-        getDocs(wordsQuery),
-        getDocs(booksQuery),
-        getDocs(notesQuery),
-      ]);
+      const hasHydratedCache =
+        typeof window !== "undefined" &&
+        window.localStorage.getItem(cacheHydrationKey(userId)) === "true";
+      const loadSnapshots = async () => {
+        if (hasHydratedCache) {
+          try {
+            return await Promise.all([
+              getDocsFromCache(wordsQuery),
+              getDocsFromCache(booksQuery),
+              getDocsFromCache(notesQuery),
+            ]);
+          } catch (cacheError) {
+            console.warn("Falling back to server-backed Firestore reads:", cacheError);
+          }
+        }
+
+        return Promise.all([
+          getDocs(wordsQuery),
+          getDocs(booksQuery),
+          getDocs(notesQuery),
+        ]);
+      };
+      const [wordsSnap, booksSnap, notesSnap] = await loadSnapshots();
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(cacheHydrationKey(userId), "true");
+      }
+
       return {
         words: wordsSnap.docs.map((d) => d.data() as any),
         books: booksSnap.docs.map((d) => d.data() as any),
