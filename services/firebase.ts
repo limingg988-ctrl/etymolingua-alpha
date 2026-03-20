@@ -9,8 +9,12 @@ import {
 } from "firebase/auth";
 import {
   initializeFirestore,
+  memoryLocalCache,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   getDocs,
+  getDocsFromCache,
   setDoc,
   doc,
   deleteDoc,
@@ -31,7 +35,17 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = initializeFirestore(app, { experimentalForceLongPolling: true });
+const supportsPersistentFirestoreCache =
+  typeof window !== "undefined" && typeof window.indexedDB !== "undefined";
+
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  localCache: supportsPersistentFirestoreCache
+    ? persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      })
+    : memoryLocalCache(),
+});
 
 export const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
@@ -57,27 +71,45 @@ const requireUserId = async () => {
   return user.uid;
 };
 
+const loadUserCollections = async (
+  userId: string,
+  source: "cache" | "server" = "server",
+) => {
+  const wordsQuery = query(collection(db, "words"), where("userId", "==", userId));
+  const booksQuery = query(collection(db, "books"), where("userId", "==", userId));
+  const notesQuery = query(collection(db, "notes"), where("userId", "==", userId));
+  const loader = source === "cache" ? getDocsFromCache : getDocs;
+  const [wordsSnap, booksSnap, notesSnap] = await Promise.all([
+    loader(wordsQuery),
+    loader(booksQuery),
+    loader(notesQuery),
+  ]);
+
+  return {
+    words: wordsSnap.docs.map((d) => d.data() as any),
+    books: booksSnap.docs.map((d) => d.data() as any),
+    notes: notesSnap.docs.map((d) => d.data() as any),
+  };
+};
+
 export const dbService = {
   async getUserId() {
     const user = await waitForAuthReady();
     return user?.uid || "guest";
   },
+  async loadAllFromCache() {
+    try {
+      const userId = await this.getUserId();
+      return await loadUserCollections(userId, "cache");
+    } catch (error) {
+      console.warn("Firestore cache read skipped:", error);
+      return null;
+    }
+  },
   async loadAll() {
     try {
       const userId = await this.getUserId();
-      const wordsQuery = query(collection(db, "words"), where("userId", "==", userId));
-      const booksQuery = query(collection(db, "books"), where("userId", "==", userId));
-      const notesQuery = query(collection(db, "notes"), where("userId", "==", userId));
-      const [wordsSnap, booksSnap, notesSnap] = await Promise.all([
-        getDocs(wordsQuery),
-        getDocs(booksQuery),
-        getDocs(notesQuery),
-      ]);
-      return {
-        words: wordsSnap.docs.map((d) => d.data() as any),
-        books: booksSnap.docs.map((d) => d.data() as any),
-        notes: notesSnap.docs.map((d) => d.data() as any),
-      };
+      return await loadUserCollections(userId, "server");
     } catch (error) {
       console.error("Firestore error:", error);
       return { words: [], books: [], notes: [] };

@@ -82,13 +82,36 @@ const App: React.FC = () => {
     return true;
   }, [language, user, showToast]);
 
-  const loadData = useCallback(async () => {
-    const data = await dbService.loadAll();
+  const applyLoadedData = useCallback((data: {
+    words: WordEntry[];
+    books: BookMetadata[];
+    notes: NoteEntry[];
+  }) => {
     setWords(data.words.sort((a, b) => b.timestamp - a.timestamp));
     setBooks(data.books);
     setNotes(data.notes.sort((a, b) => b.timestamp - a.timestamp));
-    setIsGlobalLoading(false);
   }, []);
+
+  const loadData = useCallback(async () => {
+    setIsGlobalLoading(true);
+
+    const cachedData = await dbService.loadAllFromCache();
+    const hasCachedData = Boolean(
+      cachedData &&
+      (cachedData.words.length > 0 ||
+        cachedData.books.length > 0 ||
+        cachedData.notes.length > 0),
+    );
+
+    if (cachedData && hasCachedData) {
+      applyLoadedData(cachedData);
+      setIsGlobalLoading(false);
+    }
+
+    const freshData = await dbService.loadAll();
+    applyLoadedData(freshData);
+    setIsGlobalLoading(false);
+  }, [applyLoadedData]);
 
 
   useEffect(() => {
