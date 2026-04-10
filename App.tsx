@@ -289,6 +289,11 @@ const App: React.FC = () => {
     setIsSearching(false);
   }, [language, parseSearchQueries, searchFocus, searchQuery, showToast]);
 
+  const handleStartDailyQuiz = useCallback((selectedWords: WordEntry[]) => {
+    setQuizTargetWords(selectedWords);
+    setCurrentView("quiz");
+  }, []);
+
   const handleMoveWordToTrash = useCallback(
     async (id: string) => {
       if (!ensureWritableSession()) return;
@@ -721,10 +726,7 @@ const App: React.FC = () => {
             {searchResults.length === 0 && !isSearching && (
               <StatsDashboard
                 history={activeWords}
-                onStartDailyQuiz={(w) => {
-                  setQuizTargetWords(w);
-                  setCurrentView("quiz");
-                }}
+                onStartDailyQuiz={handleStartDailyQuiz}
               />
             )}
           </div>
