@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { WordEntry } from "../types";
 import { WordCard } from "./WordCard";
+import { SkeletonLoader } from "./SkeletonLoader";
 
 type VirtualizedWordListProps = {
   words: WordEntry[];
   onDelete: (id: string) => void | Promise<void>;
   onSearchRelated: (word: string) => void | Promise<void>;
   onStatusChange: (id: string, status: WordEntry["status"]) => void | Promise<void>;
+  isWordsLoading?: boolean;
+  hasMoreWords?: boolean;
+  isLoadingMoreWords?: boolean;
+  onLoadMoreWords?: () => void | Promise<void>;
 };
 
 const INITIAL_LIST_RENDER_LIMIT = 120;
@@ -20,6 +25,10 @@ export const VirtualizedWordList: React.FC<VirtualizedWordListProps> = ({
   onDelete,
   onSearchRelated,
   onStatusChange,
+  isWordsLoading = false,
+  hasMoreWords,
+  isLoadingMoreWords = false,
+  onLoadMoreWords,
 }) => {
   const [listRenderLimit, setListRenderLimit] = useState(INITIAL_LIST_RENDER_LIMIT);
   const [listScrollTop, setListScrollTop] = useState(0);
@@ -33,7 +42,8 @@ export const VirtualizedWordList: React.FC<VirtualizedWordListProps> = ({
     () => words.slice(0, listRenderLimit),
     [words, listRenderLimit],
   );
-  const canLoadMoreListItems = boundedWords.length < words.length;
+  const canLoadMoreListItems =
+    typeof hasMoreWords === "boolean" ? hasMoreWords : boundedWords.length < words.length;
 
   const visibleRange = useMemo(() => {
     const visibleCount = Math.ceil(VIRTUAL_LIST_HEIGHT / VIRTUAL_ROW_HEIGHT);
@@ -76,17 +86,27 @@ export const VirtualizedWordList: React.FC<VirtualizedWordListProps> = ({
             ))}
         </div>
       </div>
+      {isWordsLoading && <SkeletonLoader />}
       {canLoadMoreListItems && (
         <button
           type="button"
-          onClick={() =>
+          onClick={() => {
+            if (onLoadMoreWords) {
+              onLoadMoreWords();
+              return;
+            }
             setListRenderLimit((prev) =>
               Math.min(prev + LIST_RENDER_STEP, words.length),
-            )
-          }
-          className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 py-3 rounded-2xl font-bold transition-colors"
+            );
+          }}
+          disabled={isLoadingMoreWords}
+          className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl font-bold disabled:opacity-60"
         >
-          もっと見る（残り {words.length - boundedWords.length} 件）
+          {isLoadingMoreWords
+            ? "読み込み中..."
+            : onLoadMoreWords
+              ? "さらに読む"
+              : `もっと見る（残り ${words.length - boundedWords.length} 件）`}
         </button>
       )}
     </div>
