@@ -432,8 +432,8 @@ const App: React.FC = () => {
   }, [boundedWords.length, listScrollTop, VIRTUAL_LIST_HEIGHT, VIRTUAL_OVERSCAN, VIRTUAL_ROW_HEIGHT]);
 
   const RowRenderer = useCallback(
-    ({ word, style }: { word: WordEntry; style: React.CSSProperties }) => (
-      <div style={style} key={word.id} className="px-1">
+    ({ word }: { word: WordEntry }) => (
+      <div className="px-1" key={word.id} style={{ minHeight: VIRTUAL_ROW_HEIGHT }}>
         <WordCard
           word={word}
           onDelete={handleMoveWordToTrash}
@@ -455,6 +455,7 @@ const App: React.FC = () => {
       handleMoveWordToTrash,
       handleSearchWord,
       showToast,
+      VIRTUAL_ROW_HEIGHT,
     ],
   );
 
@@ -729,27 +730,16 @@ const App: React.FC = () => {
             >
               <div
                 style={{
-                  position: "relative",
-                  height: boundedWords.length * VIRTUAL_ROW_HEIGHT,
+                  paddingTop: visibleRange.startIndex * VIRTUAL_ROW_HEIGHT,
+                  paddingBottom:
+                    (boundedWords.length - visibleRange.endIndex) * VIRTUAL_ROW_HEIGHT,
                 }}
               >
                 {boundedWords
                   .slice(visibleRange.startIndex, visibleRange.endIndex)
-                  .map((word, offset) => {
-                    const index = visibleRange.startIndex + offset;
-                    return (
-                      <RowRenderer
-                        key={word.id}
-                        word={word}
-                        style={{
-                          position: "absolute",
-                          top: index * VIRTUAL_ROW_HEIGHT,
-                          left: 0,
-                          right: 0,
-                        }}
-                      />
-                    );
-                  })}
+                  .map((word) => (
+                    <RowRenderer key={word.id} word={word} />
+                  ))}
               </div>
             </div>
             {canLoadMoreListItems && (
