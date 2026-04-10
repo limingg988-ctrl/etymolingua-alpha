@@ -36,6 +36,7 @@ type ViewMode =
   | "trash";
 
 const App: React.FC = () => {
+  const WORDS_PAGE_SIZE = 30;
   const [isGlobalLoading, setIsGlobalLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewMode>("search");
   const [user, setUser] = useState<any>(null);
@@ -60,6 +61,11 @@ const App: React.FC = () => {
   });
   const loadRequestIdRef = useRef(0);
   const [isHydratingFreshData, setIsHydratingFreshData] = useState(false);
+  const [isWordsLoading, setIsWordsLoading] = useState(false);
+  const [isLoadingMoreWords, setIsLoadingMoreWords] = useState(false);
+  const [hasMoreWords, setHasMoreWords] = useState(false);
+  const [wordsCursor, setWordsCursor] = useState<any>(null);
+  const [allWordsCount, setAllWordsCount] = useState(0);
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
@@ -88,10 +94,36 @@ const App: React.FC = () => {
     return true;
   }, [isHydratingFreshData, language, user, showToast]);
 
-  const applyLoadedData = useCallback((data: { words: WordEntry[]; books: BookMetadata[]; notes: NoteEntry[] }) => {
-    setWords(data.words.sort((a, b) => b.timestamp - a.timestamp));
+  const applyLoadedData = useCallback((data: { books: BookMetadata[]; notes: NoteEntry[] }) => {
     setBooks(data.books);
     setNotes(data.notes.sort((a, b) => b.timestamp - a.timestamp));
+  }, []);
+
+  const loadFirstWordsPage = useCallback(async (bookId: string) => {
+    setIsWordsLoading(true);
+    try {
+      const page = await dbService.loadWordsPage(bookId, null, WORDS_PAGE_SIZE, "server");
+      setWords(page.words);
+      setWordsCursor(page.nextCursor);
+      setHasMoreWords(page.hasMore);
+    } catch (error) {
+      console.error("Failed to load words page:", error);
+      showToast("単語の読み込みに失敗しました。通信状態を確認してください。", "error");
+      setWords([]);
+      setWordsCursor(null);
+      setHasMoreWords(false);
+    } finally {
+      setIsWordsLoading(false);
+    }
+  }, [WORDS_PAGE_SIZE, showToast]);
+
+  const loadAllWordsCount = useCallback(async () => {
+    try {
+      const count = await dbService.countWords("all");
+      setAllWordsCount(count);
+    } catch (error) {
+      console.warn("Failed to count all words:", error);
+    }
   }, []);
 
   const loadData = useCallback(async () => {
@@ -112,6 +144,7 @@ const App: React.FC = () => {
       if (loadRequestIdRef.current === requestId) {
         applyLoadedData(freshData);
       }
+      await Promise.all([loadFirstWordsPage(currentBookId), loadAllWordsCount()]);
     } catch (error) {
       console.error("Failed to load fresh Firestore data:", error);
       if (loadRequestIdRef.current === requestId && isGlobalLoading) {
@@ -128,7 +161,28 @@ const App: React.FC = () => {
         setIsGlobalLoading(false);
       }
     }
-  }, [applyLoadedData, isGlobalLoading, showToast]);
+  }, [applyLoadedData, currentBookId, isGlobalLoading, loadAllWordsCount, loadFirstWordsPage, showToast]);
+
+  const loadMoreWords = useCallback(async () => {
+    if (!hasMoreWords || isLoadingMoreWords) return;
+    setIsLoadingMoreWords(true);
+    try {
+      const page = await dbService.loadWordsPage(
+        currentBookId,
+        wordsCursor,
+        WORDS_PAGE_SIZE,
+        "server",
+      );
+      setWords((prev) => [...prev, ...page.words]);
+      setWordsCursor(page.nextCursor);
+      setHasMoreWords(page.hasMore);
+    } catch (error) {
+      console.error("Failed to load more words:", error);
+      showToast("追加読み込みに失敗しました。", "error");
+    } finally {
+      setIsLoadingMoreWords(false);
+    }
+  }, [WORDS_PAGE_SIZE, currentBookId, hasMoreWords, isLoadingMoreWords, showToast, wordsCursor]);
 
 
   useEffect(() => {
@@ -141,6 +195,11 @@ const App: React.FC = () => {
     });
     return () => unsubscribe();
   }, [loadData]);
+
+  useEffect(() => {
+    if (isGlobalLoading) return;
+    loadFirstWordsPage(currentBookId);
+  }, [currentBookId, isGlobalLoading, loadFirstWordsPage]);
 
   const handleLogin = async () => {
     try {
@@ -166,6 +225,7 @@ const App: React.FC = () => {
     setWords((prev) => [newWord, ...prev]);
     try {
       await dbService.addWord(newWord);
+      await loadAllWordsCount();
       showToast(`「${newWord.word}」を保存しました`, "success");
       setSearchResults([]);
       setSearchQuery("");
@@ -230,6 +290,7 @@ const App: React.FC = () => {
       );
       try {
         await dbService.deleteWord(id);
+        await loadAllWordsCount();
         showToast("単語をゴミ箱に移動しました", "info");
       } catch (error: any) {
         setWords((prev) =>
@@ -238,7 +299,7 @@ const App: React.FC = () => {
         showToast(getFirebaseErrorMessage(error), "error");
       }
     },
-    [ensureWritableSession, getFirebaseErrorMessage, showToast],
+    [ensureWritableSession, getFirebaseErrorMessage, showToast, loadAllWordsCount],
   );
 
   const handleRestoreWord = useCallback(
@@ -249,6 +310,7 @@ const App: React.FC = () => {
       );
       try {
         await dbService.restoreWord(id);
+        await loadAllWordsCount();
         showToast("単語を復元しました", "success");
       } catch (error: any) {
         setWords((prev) =>
@@ -257,7 +319,7 @@ const App: React.FC = () => {
         showToast(getFirebaseErrorMessage(error), "error");
       }
     },
-    [ensureWritableSession, getFirebaseErrorMessage, showToast],
+    [ensureWritableSession, getFirebaseErrorMessage, showToast, loadAllWordsCount],
   );
 
   const handlePermanentDeleteWord = useCallback(
@@ -267,13 +329,14 @@ const App: React.FC = () => {
       setWords((prev) => prev.filter((w) => w.id !== id));
       try {
         await dbService.permanentDeleteWord(id);
+        await loadAllWordsCount();
         showToast("単語を完全削除しました", "success");
       } catch (error: any) {
         setWords(snapshot);
         showToast(getFirebaseErrorMessage(error), "error");
       }
     },
-    [ensureWritableSession, getFirebaseErrorMessage, showToast, words],
+    [ensureWritableSession, getFirebaseErrorMessage, showToast, words, loadAllWordsCount],
   );
 
   const handleEmptyTrash = useCallback(async () => {
@@ -284,12 +347,13 @@ const App: React.FC = () => {
     setWords((prev) => prev.filter((w) => !w.isTrashed));
     try {
       await Promise.all(targetIds.map((id) => dbService.permanentDeleteWord(id)));
+      await loadAllWordsCount();
       showToast("ゴミ箱を空にしました", "success");
     } catch (error: any) {
       setWords(snapshot);
       showToast(getFirebaseErrorMessage(error), "error");
     }
-  }, [ensureWritableSession, getFirebaseErrorMessage, words, showToast]);
+  }, [ensureWritableSession, getFirebaseErrorMessage, words, showToast, loadAllWordsCount]);
 
   const handleSaveNote = useCallback(
     async (title: string, content: string, tags: string[]) => {
@@ -498,6 +562,7 @@ const App: React.FC = () => {
         await Promise.all(
           affected.map((id) => dbService.permanentDeleteWord(id)),
         );
+        await loadAllWordsCount();
         showToast("単語帳と含まれる単語を削除しました", "success");
       } catch (e: any) {
         showToast(getFirebaseErrorMessage(e), "error");
@@ -505,7 +570,7 @@ const App: React.FC = () => {
       // 削除後は全表示に戻す
       setCurrentBookId("all");
     },
-    [ensureWritableSession, getFirebaseErrorMessage, words, showToast],
+    [ensureWritableSession, getFirebaseErrorMessage, words, showToast, loadAllWordsCount],
   );
 
   // 欠損している bookId を参照する単語帳を自動復元（参照されている id と同じ id のプレースホルダを作成）
@@ -679,6 +744,16 @@ const App: React.FC = () => {
                 }}
               />
             ))}
+            {isWordsLoading && <SkeletonLoader />}
+            {!isWordsLoading && hasMoreWords && (
+              <button
+                onClick={loadMoreWords}
+                disabled={isLoadingMoreWords}
+                className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl font-bold disabled:opacity-60"
+              >
+                {isLoadingMoreWords ? "読み込み中..." : "さらに読む"}
+              </button>
+            )}
           </div>
         )}
         {currentView === "chat" && (
@@ -738,7 +813,7 @@ const App: React.FC = () => {
         onDeleteBook={handleDeleteBook}
         onRenameBook={handleRenameBook}
         allBookId={"all"}
-        allWordsCount={words.filter((w) => !w.isTrashed).length}
+        allWordsCount={allWordsCount}
       />
 
       <LoginConfirmModal
