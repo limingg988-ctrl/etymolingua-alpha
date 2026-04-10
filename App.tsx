@@ -13,7 +13,6 @@ import { UsageGuide } from "./components/UsageGuide";
 import { Toast } from "./components/Toast";
 import { SkeletonLoader } from "./components/SkeletonLoader";
 import { LoginConfirmModal } from "./components/LoginConfirmModal";
-import { VirtualizedWordList } from "./components/VirtualizedWordList";
 import {
   WordEntry,
   NoteEntry,
@@ -38,6 +37,8 @@ type ViewMode =
 
 const App: React.FC = () => {
   const WORDS_PAGE_SIZE = 30;
+  const INITIAL_VISIBLE_COUNT = 20;
+  const VISIBLE_COUNT_STEP = 20;
   const [isGlobalLoading, setIsGlobalLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewMode>("search");
   const [user, setUser] = useState<any>(null);
@@ -67,6 +68,7 @@ const App: React.FC = () => {
   const [hasMoreWords, setHasMoreWords] = useState(false);
   const [wordsCursor, setWordsCursor] = useState<any>(null);
   const [allWordsCount, setAllWordsCount] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
@@ -201,6 +203,10 @@ const App: React.FC = () => {
     if (isGlobalLoading) return;
     loadFirstWordsPage(currentBookId);
   }, [currentBookId, isGlobalLoading, loadFirstWordsPage]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
+  }, [currentBookId]);
 
   const handleLogin = async () => {
     try {
@@ -451,6 +457,11 @@ const App: React.FC = () => {
 
     return filtered.filter((w) => w.bookId === currentBookId);
   }, [words, currentBookId]);
+
+  const visibleWords = useMemo(
+    () => activeWords.slice(0, visibleCount),
+    [activeWords, visibleCount],
+  );
 
   // 表示用の単語帳名を安定して取得する
   const currentBookName = useMemo(() => {
@@ -718,12 +729,34 @@ const App: React.FC = () => {
           </div>
         )}
         {currentView === "list" && (
-          <VirtualizedWordList
-            words={activeWords}
-            onDelete={handleMoveWordToTrash}
-            onSearchRelated={handleSearchWord}
-            onStatusChange={handleUpdateWordStatus}
-          />
+          <div className="space-y-4">
+            <div className="text-sm text-slate-500 font-medium">
+              {`${visibleWords.length} / ${activeWords.length}`}
+            </div>
+            {visibleWords.map((word) => (
+              <WordCard
+                key={word.id}
+                word={word}
+                onDelete={handleMoveWordToTrash}
+                onSearchRelated={handleSearchWord}
+                onStatusChange={handleUpdateWordStatus}
+              />
+            ))}
+            {isWordsLoading && <SkeletonLoader />}
+            {activeWords.length > visibleWords.length && (
+              <button
+                type="button"
+                onClick={() =>
+                  setVisibleCount((prev) =>
+                    Math.min(prev + VISIBLE_COUNT_STEP, activeWords.length),
+                  )
+                }
+                className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl font-bold"
+              >
+                さらに表示
+              </button>
+            )}
+          </div>
         )}
         {currentView === "chat" && (
           <ChatAssistant onSaveNote={handleSaveNote} wordHistory={activeWords} language={language} />
