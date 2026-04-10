@@ -77,48 +77,51 @@ export const dbService = {
     const user = await waitForAuthReady();
     return user?.uid || "guest";
   },
+  async loadUserCollections(source: "cache" | "server") {
+    const userId = await this.getUserId();
+    const wordsQuery = query(collection(db, "words"), where("userId", "==", userId));
+    const booksQuery = query(collection(db, "books"), where("userId", "==", userId));
+    const notesQuery = query(collection(db, "notes"), where("userId", "==", userId));
+
+    const read = source === "cache" ? getDocsFromCache : getDocs;
+    const [wordsSnap, booksSnap, notesSnap] = await Promise.all([
+      read(wordsQuery),
+      read(booksQuery),
+      read(notesQuery),
+    ]);
+
+    if (source === "server" && typeof window !== "undefined") {
+      window.localStorage.setItem(cacheHydrationKey(userId), "true");
+    }
+
+    return {
+      words: wordsSnap.docs.map((d) => d.data() as any),
+      books: booksSnap.docs.map((d) => d.data() as any),
+      notes: notesSnap.docs.map((d) => d.data() as any),
+    };
+  },
+  async loadAllFromCache() {
+    const userId = await this.getUserId();
+    const hasHydratedCache =
+      typeof window !== "undefined" &&
+      window.localStorage.getItem(cacheHydrationKey(userId)) === "true";
+    if (!hasHydratedCache) {
+      return null;
+    }
+
+    try {
+      return await this.loadUserCollections("cache");
+    } catch (error) {
+      console.warn("Firestore cache read failed:", error);
+      return null;
+    }
+  },
   async loadAll() {
     try {
-      const userId = await this.getUserId();
-      const wordsQuery = query(collection(db, "words"), where("userId", "==", userId));
-      const booksQuery = query(collection(db, "books"), where("userId", "==", userId));
-      const notesQuery = query(collection(db, "notes"), where("userId", "==", userId));
-      const hasHydratedCache =
-        typeof window !== "undefined" &&
-        window.localStorage.getItem(cacheHydrationKey(userId)) === "true";
-      const loadSnapshots = async () => {
-        if (hasHydratedCache) {
-          try {
-            return await Promise.all([
-              getDocsFromCache(wordsQuery),
-              getDocsFromCache(booksQuery),
-              getDocsFromCache(notesQuery),
-            ]);
-          } catch (cacheError) {
-            console.warn("Falling back to server-backed Firestore reads:", cacheError);
-          }
-        }
-
-        return Promise.all([
-          getDocs(wordsQuery),
-          getDocs(booksQuery),
-          getDocs(notesQuery),
-        ]);
-      };
-      const [wordsSnap, booksSnap, notesSnap] = await loadSnapshots();
-
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(cacheHydrationKey(userId), "true");
-      }
-
-      return {
-        words: wordsSnap.docs.map((d) => d.data() as any),
-        books: booksSnap.docs.map((d) => d.data() as any),
-        notes: notesSnap.docs.map((d) => d.data() as any),
-      };
+      return await this.loadUserCollections("server");
     } catch (error) {
-      console.error("Firestore error:", error);
-      return { words: [], books: [], notes: [] };
+      console.error("Firestore server read error:", error);
+      throw error;
     }
   },
   async addWord(word: any) {
