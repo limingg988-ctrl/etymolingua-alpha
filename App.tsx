@@ -36,6 +36,12 @@ type ViewMode =
   | "trash";
 
 const App: React.FC = () => {
+  const INITIAL_LIST_RENDER_LIMIT = 120;
+  const LIST_RENDER_STEP = 120;
+  const VIRTUAL_ROW_HEIGHT = 360;
+  const VIRTUAL_OVERSCAN = 3;
+  const VIRTUAL_LIST_HEIGHT = 720;
+
   const [isGlobalLoading, setIsGlobalLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewMode>("search");
   const [user, setUser] = useState<any>(null);
@@ -60,6 +66,8 @@ const App: React.FC = () => {
   });
   const loadRequestIdRef = useRef(0);
   const [isHydratingFreshData, setIsHydratingFreshData] = useState(false);
+  const [listRenderLimit, setListRenderLimit] = useState(INITIAL_LIST_RENDER_LIMIT);
+  const [listScrollTop, setListScrollTop] = useState(0);
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
@@ -399,6 +407,57 @@ const App: React.FC = () => {
     return book ? book.title : "不明な単語帳（参照切れ）";
   }, [books, currentBookId]);
 
+  useEffect(() => {
+    setListRenderLimit(INITIAL_LIST_RENDER_LIMIT);
+    setListScrollTop(0);
+  }, [activeWords, currentBookId, currentView, INITIAL_LIST_RENDER_LIMIT]);
+
+  const boundedWords = useMemo(
+    () => activeWords.slice(0, listRenderLimit),
+    [activeWords, listRenderLimit],
+  );
+  const canLoadMoreListItems = boundedWords.length < activeWords.length;
+
+  const visibleRange = useMemo(() => {
+    const visibleCount = Math.ceil(VIRTUAL_LIST_HEIGHT / VIRTUAL_ROW_HEIGHT);
+    const startIndex = Math.max(
+      0,
+      Math.floor(listScrollTop / VIRTUAL_ROW_HEIGHT) - VIRTUAL_OVERSCAN,
+    );
+    const endIndex = Math.min(
+      boundedWords.length,
+      startIndex + visibleCount + VIRTUAL_OVERSCAN * 2,
+    );
+    return { startIndex, endIndex };
+  }, [boundedWords.length, listScrollTop, VIRTUAL_LIST_HEIGHT, VIRTUAL_OVERSCAN, VIRTUAL_ROW_HEIGHT]);
+
+  const RowRenderer = useCallback(
+    ({ word, style }: { word: WordEntry; style: React.CSSProperties }) => (
+      <div style={style} key={word.id} className="px-1">
+        <WordCard
+          word={word}
+          onDelete={handleMoveWordToTrash}
+          onSearchRelated={handleSearchWord}
+          onStatusChange={async (id, status) => {
+            if (!ensureWritableSession()) return;
+            try {
+              await dbService.updateWord(id, { status });
+            } catch (error: any) {
+              showToast(getFirebaseErrorMessage(error), "error");
+            }
+          }}
+        />
+      </div>
+    ),
+    [
+      ensureWritableSession,
+      getFirebaseErrorMessage,
+      handleMoveWordToTrash,
+      handleSearchWord,
+      showToast,
+    ],
+  );
+
   // 単語帳選択: 見つからない場合は即時 all に戻さず、default へ復帰させる
   const handleSelectBook = useCallback(
     async (id: string) => {
@@ -663,22 +722,49 @@ const App: React.FC = () => {
         )}
         {currentView === "list" && (
           <div className="space-y-4">
-            {activeWords.map((w) => (
-              <WordCard
-                key={w.id}
-                word={w}
-                onDelete={handleMoveWordToTrash}
-                onSearchRelated={handleSearchWord}
-                onStatusChange={async (id, status) => {
-                  if (!ensureWritableSession()) return;
-                  try {
-                    await dbService.updateWord(id, { status });
-                  } catch (error: any) {
-                    showToast(getFirebaseErrorMessage(error), "error");
-                  }
+            <div
+              className="overflow-y-auto rounded-2xl"
+              style={{ height: VIRTUAL_LIST_HEIGHT }}
+              onScroll={(event) => setListScrollTop(event.currentTarget.scrollTop)}
+            >
+              <div
+                style={{
+                  position: "relative",
+                  height: boundedWords.length * VIRTUAL_ROW_HEIGHT,
                 }}
-              />
-            ))}
+              >
+                {boundedWords
+                  .slice(visibleRange.startIndex, visibleRange.endIndex)
+                  .map((word, offset) => {
+                    const index = visibleRange.startIndex + offset;
+                    return (
+                      <RowRenderer
+                        key={word.id}
+                        word={word}
+                        style={{
+                          position: "absolute",
+                          top: index * VIRTUAL_ROW_HEIGHT,
+                          left: 0,
+                          right: 0,
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            </div>
+            {canLoadMoreListItems && (
+              <button
+                type="button"
+                onClick={() =>
+                  setListRenderLimit((prev) =>
+                    Math.min(prev + LIST_RENDER_STEP, activeWords.length),
+                  )
+                }
+                className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 py-3 rounded-2xl font-bold transition-colors"
+              >
+                もっと見る（残り {activeWords.length - boundedWords.length} 件）
+              </button>
+            )}
           </div>
         )}
         {currentView === "chat" && (
