@@ -441,7 +441,7 @@ const App: React.FC = () => {
     [ensureWritableSession, getFirebaseErrorMessage, loadData, showToast, user],
   );
 
-  // 単語フィルタリング: "all" 以外は常に選択中の bookId のみを対象にする
+  // 単語フィルタリング: "all" のときのみ全件（ゴミ箱除く）を対象にする
   const activeWords = useMemo(() => {
     const filtered = words.filter((w) => !w.isTrashed);
 
@@ -449,19 +449,14 @@ const App: React.FC = () => {
       return filtered;
     }
 
-    const selectedBook = books.find((b) => b.id === currentBookId);
-    if (!selectedBook) {
-      return [];
-    }
-
     return filtered.filter((w) => w.bookId === currentBookId);
-  }, [words, currentBookId, books]);
+  }, [words, currentBookId]);
 
   // 表示用の単語帳名を安定して取得する
   const currentBookName = useMemo(() => {
-    if (currentBookId === "all") return "すべての単語";
+    if (currentBookId === "all") return "全単語（ゴミ箱除く）";
     const book = books.find((b) => b.id === currentBookId);
-    return book ? book.title : "不明な単語帳（参照切れ）";
+    return book ? book.title : "単語帳情報なし（ID指定中）";
   }, [books, currentBookId]);
 
   const handleUpdateWordStatus = useCallback(
@@ -476,43 +471,26 @@ const App: React.FC = () => {
     [ensureWritableSession, getFirebaseErrorMessage, showToast],
   );
 
-  // 単語帳選択: 見つからない場合は即時 all に戻さず、default へ復帰させる
+  // 単語帳選択: 未知IDでも即座に "all" / default へ戻さず、選択IDを維持する
   const handleSelectBook = useCallback(
     async (id: string) => {
       if (id === "all") {
         setCurrentBookId("all");
         return;
       }
-      const bookExists = books.find((b) => b.id === id);
+
+      setCurrentBookId(id);
+
+      const bookExists = books.some((b) => b.id === id);
       if (bookExists) {
-        setCurrentBookId(id);
-        return;
-      }
-      // 指定された単語帳が見つからない場合、同じ id を参照する単語が存在するか確認
-      const referenced = words.find((w) => w.bookId === id);
-      if (referenced) {
-        // 単語は存在するがメタデータが欠けているケース
-        setCurrentBookId(id);
-        showToast(
-          "注意: 単語帳のメタデータが見つかりません。該当IDの単語を表示します。",
-          "warning",
-        );
-        return;
-      }
-      // 最後の手段で default に戻し、全件表示への誤誘導を避ける
-      const defaultBook = books.find((b) => b.id === "default");
-      if (defaultBook) {
-        setCurrentBookId("default");
-        showToast(
-          "選択した単語帳は見つかりませんでした。既定の単語帳に戻します。",
-          "warning",
-        );
         return;
       }
 
-      setCurrentBookId(id);
+      const referenced = words.some((w) => w.bookId === id);
       showToast(
-        "選択した単語帳は見つかりませんでした。選択状態を維持します。",
+        referenced
+          ? "注意: 単語帳のメタデータが見つかりません。ID一致の単語のみ表示します。"
+          : "選択した単語帳は見つかりません。ID一致の単語があれば表示します。",
         "warning",
       );
     },
