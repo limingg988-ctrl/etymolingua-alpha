@@ -35,6 +35,15 @@ type ViewMode =
   | "quiz"
   | "trash";
 
+const NAV_ITEMS: { key: ViewMode; label: string; icon: string }[] = [
+  { key: "search", label: "Dictionary", icon: "fa-solid fa-magnifying-glass" },
+  { key: "list", label: "List", icon: "fa-solid fa-list-ul" },
+  { key: "quiz", label: "Quiz", icon: "fa-solid fa-layer-group" },
+  { key: "chat", label: "Chat", icon: "fa-solid fa-comments" },
+  { key: "notebook", label: "Notebook", icon: "fa-solid fa-book-bookmark" },
+  { key: "trash", label: "Trash", icon: "fa-solid fa-trash-can" },
+];
+
 const App: React.FC = () => {
   const WORDS_PAGE_SIZE = 30;
   const INITIAL_VISIBLE_COUNT = 20;
@@ -69,6 +78,7 @@ const App: React.FC = () => {
   const [wordsCursor, setWordsCursor] = useState<any>(null);
   const [allWordsCount, setAllWordsCount] = useState(0);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
+  const [useSideNavLayout, setUseSideNavLayout] = useState(false);
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
@@ -207,6 +217,13 @@ const App: React.FC = () => {
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [currentBookId]);
+
+  useEffect(() => {
+    const updateLayout = () => setUseSideNavLayout(window.innerWidth >= 1024);
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
+  }, []);
 
   const handleLogin = async () => {
     try {
@@ -617,10 +634,10 @@ const App: React.FC = () => {
   }, [books, words, user, showToast]);
 
   if (isGlobalLoading)
-    return <div className="p-20 text-center">{t(language, "app.loading")}</div>;
+    return <div className="p-20 text-center text-surface-700">{t(language, "app.loading")}</div>;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-surface-50">
       <Header
         currentView={currentView}
         onChangeView={setCurrentView}
@@ -635,9 +652,33 @@ const App: React.FC = () => {
         language={language}
         onLanguageChange={setLanguage}
       />
-      <main className="max-w-4xl mx-auto p-4">
+      <main className="app-main-shell">
+        <div className={`${useSideNavLayout ? "grid grid-cols-[220px_minmax(0,1fr)] gap-6 items-start" : ""}`}>
+          {useSideNavLayout && (
+            <aside className="sticky top-24 ui-glass ui-elevation ui-rounded-panel p-3">
+              <p className="font-display text-sm text-surface-500 px-3 py-2">Workspace</p>
+              <nav className="space-y-1">
+                {NAV_ITEMS.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setCurrentView(item.key)}
+                    className={`w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold transition-colors ${
+                      currentView === item.key
+                        ? "bg-primary-600 text-white ui-elevation"
+                        : "text-surface-700 hover:bg-primary-50"
+                    }`}
+                  >
+                    <i className={item.icon}></i>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </aside>
+          )}
+          <section className="app-main-container">
         {currentView === "search" && (
-          <div className="space-y-6">
+          <div className="view-stack">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -650,17 +691,17 @@ const App: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t(language, "app.searchPlaceholder")}
-                className="flex-1 p-4 rounded-2xl border-2 focus:border-indigo-500 outline-none"
+                className="flex-1 p-4 rounded-2xl border-2 border-surface-200 bg-white text-surface-900 focus:border-primary-500 outline-none"
               />
               <button
                 type="submit"
-                className="bg-indigo-600 text-white px-6 rounded-2xl font-bold"
+                className="bg-primary-600 text-white px-6 rounded-2xl font-bold"
               >
                 {t(language, "app.search")}
               </button>
             </form>
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-slate-500 font-bold">{t(language, "app.searchMode")}</span>
+              <span className="text-surface-500 font-bold">{t(language, "app.searchMode")}</span>
               {([
                 { key: "all", label: "すべて" },
                 { key: "idioms", label: "idiom重視" },
@@ -673,20 +714,20 @@ const App: React.FC = () => {
                   onClick={() => setSearchFocus(mode.key)}
                   className={`px-3 py-1.5 rounded-full border font-bold transition-colors ${
                     searchFocus === mode.key
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                      ? "bg-primary-600 text-white border-primary-600"
+                      : "bg-white text-surface-700 border-surface-200 hover:border-primary-300"
                   }`}
                 >
                   {mode.label}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-surface-500">
               複数検索は「, / 改行 / ;」区切りで入力できます（例: take off, resilience, look up）。「/」を含む語は1語として扱います。
             </p>
             {isSearching && <SkeletonLoader />}
             {searchResults.map((result, idx) => (
-              <div key={`${result.word}-${idx}`} className="space-y-2">
+              <div key={`${result.word}-${idx}`} className="space-y-2 ui-glass ui-rounded-panel p-3">
                 <WordCard
                   word={
                     {
@@ -699,7 +740,7 @@ const App: React.FC = () => {
                 />
                 <button
                   onClick={() => handleAddWord(result)}
-                  className="w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold shadow-lg"
+                  className="w-full bg-primary-600 text-white py-3 rounded-2xl font-bold ui-elevation"
                 >
                   {t(language, "app.addWord", { word: result.word })}
                 </button>
@@ -712,7 +753,7 @@ const App: React.FC = () => {
                     await handleAddWord(result);
                   }
                 }}
-                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg"
+                className="w-full bg-secondary-500 text-white py-4 rounded-2xl font-bold ui-elevation"
               >
                 {t(language, "app.addAll", { count: searchResults.length })}
               </button>
@@ -729,8 +770,8 @@ const App: React.FC = () => {
           </div>
         )}
         {currentView === "list" && (
-          <div className="space-y-4">
-            <div className="text-sm text-slate-500 font-medium">
+          <div className="view-stack">
+            <div className="text-sm text-surface-500 font-medium">
               {`${visibleWords.length} / ${activeWords.length}`}
             </div>
             {visibleWords.map((word) => (
@@ -751,7 +792,7 @@ const App: React.FC = () => {
                     Math.min(prev + VISIBLE_COUNT_STEP, activeWords.length),
                   )
                 }
-                className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl font-bold"
+                className="w-full bg-white border border-surface-200 text-surface-700 py-3 rounded-2xl font-bold"
               >
                 さらに表示
               </button>
@@ -793,6 +834,8 @@ const App: React.FC = () => {
             onClose={() => setCurrentView("list")}
           />
         )}
+          </section>
+        </div>
       </main>
 
       <UsageGuide isOpen={showUsage} onClose={() => setShowUsage(false)} />
