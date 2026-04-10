@@ -22,6 +22,10 @@ import {
   writeBatch,
   query,
   where,
+  orderBy,
+  limit,
+  startAfter,
+  getCountFromServer,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -77,28 +81,63 @@ export const dbService = {
     const user = await waitForAuthReady();
     return user?.uid || "guest";
   },
-  async loadUserCollections(source: "cache" | "server") {
+  async loadBooks(source: "cache" | "server" = "server") {
     const userId = await this.getUserId();
-    const wordsQuery = query(collection(db, "words"), where("userId", "==", userId));
     const booksQuery = query(collection(db, "books"), where("userId", "==", userId));
-    const notesQuery = query(collection(db, "notes"), where("userId", "==", userId));
-
     const read = source === "cache" ? getDocsFromCache : getDocs;
-    const [wordsSnap, booksSnap, notesSnap] = await Promise.all([
-      read(wordsQuery),
-      read(booksQuery),
-      read(notesQuery),
-    ]);
-
+    const booksSnap = await read(booksQuery);
+    return booksSnap.docs.map((d) => d.data() as any);
+  },
+  async loadNotes(source: "cache" | "server" = "server") {
+    const userId = await this.getUserId();
+    const notesQuery = query(collection(db, "notes"), where("userId", "==", userId));
+    const read = source === "cache" ? getDocsFromCache : getDocs;
+    const notesSnap = await read(notesQuery);
+    return notesSnap.docs.map((d) => d.data() as any);
+  },
+  async loadWordsPage(
+    bookId: string,
+    cursor: any | null = null,
+    pageSize = 30,
+    source: "cache" | "server" = "server",
+  ) {
+    const userId = await this.getUserId();
+    const wordsRef = collection(db, "words");
+    const baseConstraints: any[] = [
+      where("userId", "==", userId),
+      orderBy("timestamp", "desc"),
+      limit(pageSize),
+    ];
+    if (bookId !== "all") {
+      baseConstraints.unshift(where("bookId", "==", bookId));
+    }
+    if (cursor) {
+      baseConstraints.push(startAfter(cursor));
+    }
+    const wordsQuery = query(wordsRef, ...baseConstraints);
+    const read = source === "cache" ? getDocsFromCache : getDocs;
+    const wordsSnap = await read(wordsQuery);
+    const docs = wordsSnap.docs;
     if (source === "server" && typeof window !== "undefined") {
       window.localStorage.setItem(cacheHydrationKey(userId), "true");
     }
 
     return {
-      words: wordsSnap.docs.map((d) => d.data() as any),
-      books: booksSnap.docs.map((d) => d.data() as any),
-      notes: notesSnap.docs.map((d) => d.data() as any),
+      words: docs.map((d) => d.data() as any),
+      nextCursor: docs.length > 0 ? docs[docs.length - 1] : null,
+      hasMore: docs.length === pageSize,
     };
+  },
+  async countWords(bookId: string = "all") {
+    const userId = await this.getUserId();
+    const wordsRef = collection(db, "words");
+    const constraints: any[] = [where("userId", "==", userId)];
+    if (bookId !== "all") {
+      constraints.push(where("bookId", "==", bookId));
+    }
+    const q = query(wordsRef, ...constraints);
+    const snap = await getCountFromServer(q);
+    return snap.data().count;
   },
   async loadAllFromCache() {
     const userId = await this.getUserId();
@@ -110,7 +149,11 @@ export const dbService = {
     }
 
     try {
-      return await this.loadUserCollections("cache");
+      const [books, notes] = await Promise.all([
+        this.loadBooks("cache"),
+        this.loadNotes("cache"),
+      ]);
+      return { books, notes };
     } catch (error) {
       console.warn("Firestore cache read failed:", error);
       return null;
@@ -118,7 +161,11 @@ export const dbService = {
   },
   async loadAll() {
     try {
-      return await this.loadUserCollections("server");
+      const [books, notes] = await Promise.all([
+        this.loadBooks("server"),
+        this.loadNotes("server"),
+      ]);
+      return { books, notes };
     } catch (error) {
       console.error("Firestore server read error:", error);
       throw error;
