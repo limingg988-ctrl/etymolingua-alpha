@@ -13,6 +13,7 @@ import { UsageGuide } from "./components/UsageGuide";
 import { Toast } from "./components/Toast";
 import { SkeletonLoader } from "./components/SkeletonLoader";
 import { LoginConfirmModal } from "./components/LoginConfirmModal";
+import { VirtualizedWordList } from "./components/VirtualizedWordList";
 import {
   WordEntry,
   NoteEntry,
@@ -463,6 +464,18 @@ const App: React.FC = () => {
     return book ? book.title : "不明な単語帳（参照切れ）";
   }, [books, currentBookId]);
 
+  const handleUpdateWordStatus = useCallback(
+    async (id: string, status: WordStatus) => {
+      if (!ensureWritableSession()) return;
+      try {
+        await dbService.updateWord(id, { status });
+      } catch (error: any) {
+        showToast(getFirebaseErrorMessage(error), "error");
+      }
+    },
+    [ensureWritableSession, getFirebaseErrorMessage, showToast],
+  );
+
   // 単語帳選択: 見つからない場合は即時 all に戻さず、default へ復帰させる
   const handleSelectBook = useCallback(
     async (id: string) => {
@@ -727,34 +740,12 @@ const App: React.FC = () => {
           </div>
         )}
         {currentView === "list" && (
-          <div className="space-y-4">
-            {activeWords.map((w) => (
-              <WordCard
-                key={w.id}
-                word={w}
-                onDelete={handleMoveWordToTrash}
-                onSearchRelated={handleSearchWord}
-                onStatusChange={async (id, status) => {
-                  if (!ensureWritableSession()) return;
-                  try {
-                    await dbService.updateWord(id, { status });
-                  } catch (error: any) {
-                    showToast(getFirebaseErrorMessage(error), "error");
-                  }
-                }}
-              />
-            ))}
-            {isWordsLoading && <SkeletonLoader />}
-            {!isWordsLoading && hasMoreWords && (
-              <button
-                onClick={loadMoreWords}
-                disabled={isLoadingMoreWords}
-                className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl font-bold disabled:opacity-60"
-              >
-                {isLoadingMoreWords ? "読み込み中..." : "さらに読む"}
-              </button>
-            )}
-          </div>
+          <VirtualizedWordList
+            words={activeWords}
+            onDelete={handleMoveWordToTrash}
+            onSearchRelated={handleSearchWord}
+            onStatusChange={handleUpdateWordStatus}
+          />
         )}
         {currentView === "chat" && (
           <ChatAssistant onSaveNote={handleSaveNote} wordHistory={activeWords} language={language} />
