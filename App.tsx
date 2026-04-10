@@ -35,15 +35,6 @@ type ViewMode =
   | "quiz"
   | "trash";
 
-const NAV_ITEMS: { key: ViewMode; label: string; icon: string }[] = [
-  { key: "search", label: "Dictionary", icon: "fa-solid fa-magnifying-glass" },
-  { key: "list", label: "List", icon: "fa-solid fa-list-ul" },
-  { key: "quiz", label: "Quiz", icon: "fa-solid fa-layer-group" },
-  { key: "chat", label: "Chat", icon: "fa-solid fa-comments" },
-  { key: "notebook", label: "Notebook", icon: "fa-solid fa-book-bookmark" },
-  { key: "trash", label: "Trash", icon: "fa-solid fa-trash-can" },
-];
-
 const App: React.FC = () => {
   const WORDS_PAGE_SIZE = 30;
   const INITIAL_VISIBLE_COUNT = 20;
@@ -78,7 +69,6 @@ const App: React.FC = () => {
   const [wordsCursor, setWordsCursor] = useState<any>(null);
   const [allWordsCount, setAllWordsCount] = useState(0);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
-  const [useSideNavLayout, setUseSideNavLayout] = useState(false);
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
@@ -217,13 +207,6 @@ const App: React.FC = () => {
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [currentBookId]);
-
-  useEffect(() => {
-    const updateLayout = () => setUseSideNavLayout(window.innerWidth >= 1024);
-    updateLayout();
-    window.addEventListener("resize", updateLayout);
-    return () => window.removeEventListener("resize", updateLayout);
-  }, []);
 
   const handleLogin = async () => {
     try {
@@ -652,30 +635,7 @@ const App: React.FC = () => {
         language={language}
         onLanguageChange={setLanguage}
       />
-      <main className="app-main-shell">
-        <div className={`${useSideNavLayout ? "grid grid-cols-[220px_minmax(0,1fr)] gap-6 items-start" : ""}`}>
-          {useSideNavLayout && (
-            <aside className="sticky top-24 ui-glass ui-elevation ui-rounded-panel p-3">
-              <p className="font-display text-sm text-surface-500 px-3 py-2">Workspace</p>
-              <nav className="space-y-1">
-                {NAV_ITEMS.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setCurrentView(item.key)}
-                    className={`w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold transition-colors ${
-                      currentView === item.key
-                        ? "bg-primary-600 text-white ui-elevation"
-                        : "text-surface-700 hover:bg-primary-50"
-                    }`}
-                  >
-                    <i className={item.icon}></i>
-                    <span>{item.label}</span>
-                  </button>
-                ))}
-              </nav>
-            </aside>
-          )}
+      <main className="app-main-shell md:pl-56">
           <section className="app-main-container">
         {currentView === "search" && (
           <div className="view-stack">
@@ -835,7 +795,6 @@ const App: React.FC = () => {
           />
         )}
           </section>
-        </div>
       </main>
 
       <UsageGuide isOpen={showUsage} onClose={() => setShowUsage(false)} />
