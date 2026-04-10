@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Header } from "./components/Header";
 import { WordCard } from "./components/WordCard";
 import { StatsDashboard } from "./components/StatsDashboard";
@@ -58,6 +58,8 @@ const App: React.FC = () => {
     type: "info" as any,
     isVisible: false,
   });
+  const loadRequestIdRef = useRef(0);
+  const [isHydratingFreshData, setIsHydratingFreshData] = useState(false);
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
@@ -74,21 +76,59 @@ const App: React.FC = () => {
   }, [language]);
 
   const ensureWritableSession = useCallback(() => {
+    if (isHydratingFreshData) {
+      showToast("同期中です。少し待ってから再度お試しください。", "info");
+      return false;
+    }
     if (!user) {
       setShowLogin(true);
       showToast(t(language, "app.saveLoginRequired"), "warning");
       return false;
     }
     return true;
-  }, [language, user, showToast]);
+  }, [isHydratingFreshData, language, user, showToast]);
 
-  const loadData = useCallback(async () => {
-    const data = await dbService.loadAll();
+  const applyLoadedData = useCallback((data: { words: WordEntry[]; books: BookMetadata[]; notes: NoteEntry[] }) => {
     setWords(data.words.sort((a, b) => b.timestamp - a.timestamp));
     setBooks(data.books);
     setNotes(data.notes.sort((a, b) => b.timestamp - a.timestamp));
-    setIsGlobalLoading(false);
   }, []);
+
+  const loadData = useCallback(async () => {
+    const requestId = Date.now();
+    loadRequestIdRef.current = requestId;
+    let hasAppliedCachedData = false;
+
+    try {
+      const cached = await dbService.loadAllFromCache();
+      if (cached && loadRequestIdRef.current === requestId) {
+        applyLoadedData(cached);
+        hasAppliedCachedData = true;
+        setIsGlobalLoading(false);
+      }
+
+      setIsHydratingFreshData(true);
+      const freshData = await dbService.loadAll();
+      if (loadRequestIdRef.current === requestId) {
+        applyLoadedData(freshData);
+      }
+    } catch (error) {
+      console.error("Failed to load fresh Firestore data:", error);
+      if (loadRequestIdRef.current === requestId && isGlobalLoading) {
+        setIsGlobalLoading(false);
+      }
+      if (hasAppliedCachedData) {
+        showToast("最新データの同期に失敗しました。キャッシュ表示を継続します。", "warning");
+      } else {
+        showToast("データの読み込みに失敗しました。通信状態を確認してください。", "error");
+      }
+    } finally {
+      if (loadRequestIdRef.current === requestId) {
+        setIsHydratingFreshData(false);
+        setIsGlobalLoading(false);
+      }
+    }
+  }, [applyLoadedData, isGlobalLoading, showToast]);
 
 
   useEffect(() => {
@@ -336,13 +376,19 @@ const App: React.FC = () => {
     [ensureWritableSession, getFirebaseErrorMessage, loadData, showToast, user],
   );
 
-  // 強化された単語フィルタリング: 単語帳が見つからない場合は全表示にフォールバック
+  // 単語フィルタリング: "all" 以外は常に選択中の bookId のみを対象にする
   const activeWords = useMemo(() => {
-    let filtered = words.filter((w) => !w.isTrashed);
-    // もし「すべて」が選ばれているか、選んだ単語帳が存在しない場合は全表示
-    if (currentBookId === "all" || !books.find((b) => b.id === currentBookId)) {
+    const filtered = words.filter((w) => !w.isTrashed);
+
+    if (currentBookId === "all") {
       return filtered;
     }
+
+    const selectedBook = books.find((b) => b.id === currentBookId);
+    if (!selectedBook) {
+      return [];
+    }
+
     return filtered.filter((w) => w.bookId === currentBookId);
   }, [words, currentBookId, books]);
 
@@ -350,10 +396,10 @@ const App: React.FC = () => {
   const currentBookName = useMemo(() => {
     if (currentBookId === "all") return "すべての単語";
     const book = books.find((b) => b.id === currentBookId);
-    return book ? book.title : "未分類の単語";
+    return book ? book.title : "不明な単語帳（参照切れ）";
   }, [books, currentBookId]);
 
-  // 単語帳選択の堅牢化: 指定の単語帳が見つからない場合は可能な復旧を試みる
+  // 単語帳選択: 見つからない場合は即時 all に戻さず、default へ復帰させる
   const handleSelectBook = useCallback(
     async (id: string) => {
       if (id === "all") {
@@ -376,11 +422,21 @@ const App: React.FC = () => {
         );
         return;
       }
-      // 最後の手段で全表示に戻す
-      setCurrentBookId("all");
+      // 最後の手段で default に戻し、全件表示への誤誘導を避ける
+      const defaultBook = books.find((b) => b.id === "default");
+      if (defaultBook) {
+        setCurrentBookId("default");
+        showToast(
+          "選択した単語帳は見つかりませんでした。既定の単語帳に戻します。",
+          "warning",
+        );
+        return;
+      }
+
+      setCurrentBookId(id);
       showToast(
-        "選択した単語帳は見つかりませんでした。全ての単語を表示します。",
-        "info",
+        "選択した単語帳は見つかりませんでした。選択状態を維持します。",
+        "warning",
       );
     },
     [books, words, showToast],
