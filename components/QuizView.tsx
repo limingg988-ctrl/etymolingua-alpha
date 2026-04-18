@@ -130,6 +130,22 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
     }
   }, [step, isFlipped, mode, feedback]);
 
+  useEffect(() => {
+    if (step !== 'quiz' || mode !== 'choice' || isFlipped || feedback !== null) return;
+
+    const handleChoiceKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const keyMap: Record<string, number> = { a: 0, b: 1, c: 2, d: 3 };
+      const optionIndex = keyMap[key];
+      if (optionIndex === undefined || optionIndex >= options.length) return;
+      event.preventDefault();
+      handleChoiceAnswer(options[optionIndex]);
+    };
+
+    window.addEventListener('keydown', handleChoiceKeyDown);
+    return () => window.removeEventListener('keydown', handleChoiceKeyDown);
+  }, [step, mode, isFlipped, feedback, options]);
+
   const toggleStatusFilter = (status: WordStatus) => {
     setSelectedModes(prev => 
       prev.includes(status) ? prev.filter(m => m !== status) : [...prev, status]
@@ -589,32 +605,65 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
 
   const currentWord = quizQueue[currentIndex];
   const progress = ((currentIndex + 1) / quizQueue.length) * 100;
+  const answeredCount = sessionStats.mastered + sessionStats.learning + sessionStats.unknown;
+  const accuracy = answeredCount > 0
+    ? Math.round(((sessionStats.mastered + sessionStats.learning * 0.5) / answeredCount) * 100)
+    : 0;
+  const streak = Math.max(0, sessionStats.mastered - sessionStats.unknown);
   const isDailyQuest = preselectedWords && preselectedWords.length > 0;
   const isAiMode = currentWord.bookId === 'ai-generated';
+  const optionLabels = ['A', 'B', 'C', 'D'];
 
   return (
-    <div className="max-w-2xl mx-auto animate-in fade-in duration-300 pb-20">
-      <div className="flex justify-between items-center mb-6 px-2">
-         <button onClick={onExit} className="text-slate-400 hover:text-slate-600 transition-colors">
+    <div className="max-w-3xl mx-auto animate-in fade-in duration-300 pb-20">
+      <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 -mx-2 px-2 pt-2 pb-4 mb-6 border-b border-slate-200/70">
+        <div className="flex justify-between items-center gap-3 mb-3">
+          <button
+            onClick={onExit}
+            className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            aria-label="Exit quiz"
+          >
            <i className="fa-solid fa-xmark text-xl"></i>
-         </button>
-         <div className="flex-1 mx-6">
-           <div className="flex justify-between text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">
-             <span>{isAiMode ? "AI Challenge" : (mode === 'srs_review' ? "Review Session" : "Progress")}</span>
-             <span>{currentIndex + 1} / {quizQueue.length}</span>
-           </div>
-           <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-             <div 
-               className="h-full bg-indigo-500 transition-all duration-300"
-               style={{ width: `${progress}%` }}
-             ></div>
-           </div>
-         </div>
-         {mode !== 'flashcard' && !isFlipped && (
-           <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold ${timeLeft <= 5 ? 'border-red-400 text-red-500 animate-pulse' : 'border-slate-200 text-slate-400'}`}>
-             {timeLeft}
-           </div>
-         )}
+          </button>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between text-xs text-slate-500 font-bold mb-1 uppercase tracking-wider">
+              <span className="truncate">{isAiMode ? "AI Challenge" : (mode === 'srs_review' ? "Review Session" : "Progress")}</span>
+              <span>Question {currentIndex + 1}/{quizQueue.length}</span>
+            </div>
+            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-indigo-500 transition-all duration-300"
+                style={{ width: `${progress}%` }}
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={progress}
+                aria-label="Quiz progress"
+              ></div>
+            </div>
+          </div>
+
+          {mode !== 'flashcard' && !isFlipped && (
+            <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center text-xs font-bold ${timeLeft <= 5 ? 'border-red-400 text-red-500 animate-pulse' : 'border-slate-200 text-slate-400'}`}>
+              {timeLeft}
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-white border border-slate-200 p-3">
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Streak</p>
+            <p className="text-lg font-extrabold text-amber-500 flex items-center gap-1">
+              <i className="fa-solid fa-fire-flame-curved"></i>
+              {streak}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white border border-slate-200 p-3">
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Accuracy</p>
+            <p className="text-lg font-extrabold text-indigo-600">{accuracy}%</p>
+          </div>
+        </div>
       </div>
 
       {/* Flip Card Container */}
@@ -646,20 +695,25 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
               )}
 
               {mode === 'choice' && (
-                <div className="w-full h-full flex flex-col">
-                   <div className="flex-grow-[2] flex flex-col items-center justify-center mb-8 bg-white rounded-3xl shadow-sm border border-slate-100 p-8 min-h-[200px] relative">
+                <div className="w-full h-full flex flex-col gap-4">
+                   <div className="flex-grow-[2] flex flex-col items-center justify-center bg-white rounded-3xl shadow-md border border-slate-200 p-8 min-h-[220px] relative">
                       {isAiMode && (
                         <div className="absolute top-4 right-4 text-[10px] bg-indigo-50 text-indigo-500 px-2 py-1 rounded font-bold">AI Challenge</div>
                       )}
-                      <p className="text-slate-400 text-xs font-bold uppercase mb-4 tracking-widest bg-slate-100 px-3 py-1 rounded-full">Meaning?</p>
-                      <h3 className="text-5xl font-extrabold text-slate-900 mb-2 tracking-tight">{currentWord.word}</h3>
-                      <p className="text-slate-400 font-mono text-lg">{currentWord.pronunciation}</p>
+                      <p className="text-slate-400 text-xs font-bold uppercase mb-4 tracking-widest bg-slate-100 px-3 py-1 rounded-full">Question</p>
+                      <h3 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-2 tracking-tight">{currentWord.word}</h3>
+                      <p className="text-slate-400 font-mono text-base md:text-lg">{currentWord.pronunciation}</p>
+                      <p className="mt-6 text-sm text-slate-500">正しい意味を選んでください</p>
                    </div>
-                   
-                   <div className="grid grid-cols-1 gap-3">
+
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                      {options.map((opt, idx) => {
-                       let btnClass = "bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50";
-                       let icon = <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-400 text-xs flex items-center justify-center mr-3 font-mono">{idx + 1}</span>;
+                       let btnClass = "bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50";
+                       let icon = (
+                         <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 text-xs flex items-center justify-center mr-3 font-bold">
+                           {optionLabels[idx] || idx + 1}
+                         </span>
+                       );
                        
                        if (feedback) {
                          if (opt === currentWord.meaning) {
@@ -678,7 +732,8 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
                            key={idx}
                            onClick={() => handleChoiceAnswer(opt)}
                            disabled={feedback !== null}
-                           className={`w-full p-4 text-left font-bold rounded-2xl border-2 transition-all duration-300 flex items-center ${btnClass} ${feedback ? '' : 'hover:scale-[1.01] hover:shadow-md'}`}
+                           className={`w-full p-4 text-left font-bold rounded-2xl border-2 transition-all duration-300 flex items-center min-h-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${btnClass} ${feedback ? '' : 'hover:scale-[1.01] hover:shadow-md'}`}
+                           aria-label={`Option ${optionLabels[idx] || idx + 1}: ${opt}`}
                          >
                            {icon}
                            <span className="text-sm md:text-base leading-tight">{opt}</span>
