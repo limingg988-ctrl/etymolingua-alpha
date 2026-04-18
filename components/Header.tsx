@@ -4,6 +4,7 @@ import { AppLanguage, getLanguageLabel, t } from "../services/i18n";
 type ViewMode =
   | "search"
   | "list"
+  | "analytics"
   | "chat"
   | "notebook"
   | "thesaurus"
@@ -28,6 +29,7 @@ interface HeaderProps {
 const NAV_ITEMS: { key: ViewMode; labelKey: string; icon: string }[] = [
   { key: "search", labelKey: "header.dictionary", icon: "fa-solid fa-magnifying-glass" },
   { key: "list", labelKey: "header.list", icon: "fa-solid fa-list-ul" },
+  { key: "analytics", labelKey: "header.analytics", icon: "fa-solid fa-chart-simple" },
   { key: "quiz", labelKey: "header.quiz", icon: "fa-solid fa-layer-group" },
   { key: "chat", labelKey: "header.chat", icon: "fa-solid fa-comments" },
   { key: "notebook", labelKey: "header.notebook", icon: "fa-solid fa-book-bookmark" },

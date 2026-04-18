@@ -14,6 +14,7 @@ import { Toast } from "./components/Toast";
 import { SkeletonLoader } from "./components/SkeletonLoader";
 import { LoginConfirmModal } from "./components/LoginConfirmModal";
 import { WordIntelligenceView } from "./components/WordIntelligenceView";
+import { AnalyticsView } from "./components/AnalyticsView";
 import {
   WordEntry,
   NoteEntry,
@@ -30,6 +31,7 @@ import { AppLanguage, t } from "./services/i18n";
 type ViewMode =
   | "search"
   | "list"
+  | "analytics"
   | "chat"
   | "notebook"
   | "thesaurus"
@@ -886,6 +888,9 @@ const App: React.FC = () => {
         )}
         {currentView === "chat" && (
           <ChatAssistant onSaveNote={handleSaveNote} wordHistory={activeWords} language={language} />
+        )}
+        {currentView === "analytics" && (
+          <AnalyticsView words={activeWords} />
         )}
         {currentView === "notebook" && (
           <SmartNotebook notes={notes} onDeleteNote={handleDeleteNote} />
