@@ -69,6 +69,9 @@ const App: React.FC = () => {
   const [wordsCursor, setWordsCursor] = useState<any>(null);
   const [allWordsCount, setAllWordsCount] = useState(0);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
+  const [listSearchQuery, setListSearchQuery] = useState("");
+  const [listSort, setListSort] = useState<"newest" | "oldest" | "wordAsc" | "status">("newest");
+  const [selectedRootChip, setSelectedRootChip] = useState<string>("all");
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
@@ -207,6 +210,10 @@ const App: React.FC = () => {
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [currentBookId]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
+  }, [listSearchQuery, listSort, selectedRootChip]);
 
   const handleLogin = async () => {
     try {
@@ -463,9 +470,52 @@ const App: React.FC = () => {
     return filtered.filter((w) => w.bookId === currentBookId);
   }, [words, currentBookId]);
 
+  const listRootChips = useMemo(() => {
+    const allRoots = activeWords.flatMap((word) =>
+      (word.etymology.match(/-[a-z]{2,}/gi) || []).map((token) => token.toLowerCase()),
+    );
+    return ["all", ...Array.from(new Set(allRoots)).slice(0, 16)];
+  }, [activeWords]);
+
+  const filteredListWords = useMemo(() => {
+    const q = listSearchQuery.trim().toLowerCase();
+    return activeWords.filter((word) => {
+      const queryHit =
+        q.length === 0 ||
+        word.word.toLowerCase().includes(q) ||
+        word.meaning.toLowerCase().includes(q) ||
+        word.etymology.toLowerCase().includes(q);
+      const rootHit =
+        selectedRootChip === "all" ||
+        (word.etymology.match(/-[a-z]{2,}/gi) || [])
+          .map((token) => token.toLowerCase())
+          .includes(selectedRootChip);
+      return queryHit && rootHit;
+    });
+  }, [activeWords, listSearchQuery, selectedRootChip]);
+
+  const sortedListWords = useMemo(() => {
+    const statusRank: Record<WordStatus, number> = {
+      unknown: 0,
+      learning: 1,
+      mastered: 2,
+    };
+    const copied = [...filteredListWords];
+    copied.sort((a, b) => {
+      if (listSort === "oldest") return a.timestamp - b.timestamp;
+      if (listSort === "wordAsc") return a.word.localeCompare(b.word);
+      if (listSort === "status") {
+        const statusDiff = statusRank[a.status] - statusRank[b.status];
+        return statusDiff !== 0 ? statusDiff : b.timestamp - a.timestamp;
+      }
+      return b.timestamp - a.timestamp;
+    });
+    return copied;
+  }, [filteredListWords, listSort]);
+
   const visibleWords = useMemo(
-    () => activeWords.slice(0, visibleCount),
-    [activeWords, visibleCount],
+    () => sortedListWords.slice(0, visibleCount),
+    [sortedListWords, visibleCount],
   );
 
   // 表示用の単語帳名を安定して取得する
@@ -733,8 +783,47 @@ const App: React.FC = () => {
         )}
         {currentView === "list" && (
           <div className="view-stack">
+            <div className="ui-glass ui-rounded-panel p-3 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {listRootChips.map((root) => (
+                  <button
+                    key={root}
+                    type="button"
+                    onClick={() => setSelectedRootChip(root)}
+                    className={`px-3 py-1.5 text-xs rounded-full border font-bold transition-colors ${
+                      selectedRootChip === root
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
+                    }`}
+                  >
+                    {root === "all" ? "すべてのroot" : root}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-col md:flex-row gap-2">
+                <input
+                  type="text"
+                  value={listSearchQuery}
+                  onChange={(e) => setListSearchQuery(e.target.value)}
+                  placeholder="見出し / 意味 / 語源で検索"
+                  className="flex-1 p-3 rounded-xl border border-surface-200 bg-white text-surface-900 outline-none focus:border-primary-500"
+                />
+                <select
+                  value={listSort}
+                  onChange={(e) =>
+                    setListSort(e.target.value as "newest" | "oldest" | "wordAsc" | "status")
+                  }
+                  className="md:w-52 p-3 rounded-xl border border-surface-200 bg-white text-surface-900 outline-none focus:border-primary-500"
+                >
+                  <option value="newest">新しい順</option>
+                  <option value="oldest">古い順</option>
+                  <option value="wordAsc">見出しA→Z</option>
+                  <option value="status">ステータス順</option>
+                </select>
+              </div>
+            </div>
             <div className="text-sm text-surface-500 font-medium">
-              {`${visibleWords.length} / ${activeWords.length}`}
+              {`${visibleWords.length} / ${sortedListWords.length}`}
             </div>
             {visibleWords.map((word) => (
               <WordCard
@@ -743,15 +832,17 @@ const App: React.FC = () => {
                 onDelete={handleMoveWordToTrash}
                 onSearchRelated={handleSearchWord}
                 onStatusChange={handleUpdateWordStatus}
+                compact
+                onOpenDetail={(target) => handleSearchWord(target.word)}
               />
             ))}
             {isWordsLoading && <SkeletonLoader />}
-            {activeWords.length > visibleWords.length && (
+            {sortedListWords.length > visibleWords.length && (
               <button
                 type="button"
                 onClick={() =>
                   setVisibleCount((prev) =>
-                    Math.min(prev + VISIBLE_COUNT_STEP, activeWords.length),
+                    Math.min(prev + VISIBLE_COUNT_STEP, sortedListWords.length),
                   )
                 }
                 className="w-full bg-white border border-surface-200 text-surface-700 py-3 rounded-2xl font-bold"
