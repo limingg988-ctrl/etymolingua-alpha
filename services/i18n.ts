@@ -5,6 +5,7 @@ const TEXT = {
     header: {
       dictionary: '辞典',
       list: 'リスト',
+      analytics: '分析',
       quiz: 'クイズ',
       chat: 'AI会話',
       notebook: 'ノート',
@@ -47,7 +48,7 @@ const TEXT = {
     },
   },
   en: {
-    header: { dictionary: 'Dictionary', list: 'List', quiz: 'Quiz', chat: 'AI Chat', notebook: 'Notes', trash: 'Trash', login: 'Login', logout: 'Logout', switchBook: 'Switch wordbook', language: 'Language' },
+    header: { dictionary: 'Dictionary', list: 'List', analytics: 'Analytics', quiz: 'Quiz', chat: 'AI Chat', notebook: 'Notes', trash: 'Trash', login: 'Login', logout: 'Logout', switchBook: 'Switch wordbook', language: 'Language' },
     app: {
       loading: 'Loading...', searchPlaceholder: 'Enter English word...', search: 'Search', searchMode: 'Search mode:', addWord: 'Add "{word}" to wordbook', addAll: 'Add all {count} words shown', searchFailed: 'Search failed', firebaseDenied: 'Save failed (permission denied). Please check login state and Firebase project settings.', loginRequired: 'Login is required to save. Please login and try again.', saveLoginRequired: 'Login is required for saving', noWordsImported: 'No words found to import'
     },
@@ -58,7 +59,7 @@ const TEXT = {
     quiz: { lookupWord: 'Look up this word', lookupHint: 'Open this AI-generated word in Dictionary tab', next: 'Next question', tapToFlip: 'Tap to reveal answer' },
   },
   'zh-CN': {
-    header: { dictionary: '词典', list: '列表', quiz: '测验', chat: 'AI 对话', notebook: '笔记', trash: '回收站', login: '登录', logout: '退出', switchBook: '切换词书', language: '语言' },
+    header: { dictionary: '词典', list: '列表', analytics: '分析', quiz: '测验', chat: 'AI 对话', notebook: '笔记', trash: '回收站', login: '登录', logout: '退出', switchBook: '切换词书', language: '语言' },
     app: {
       loading: '加载中...', searchPlaceholder: '输入英文单词...', search: '搜索', searchMode: '搜索模式：', addWord: '将“{word}”加入词书', addAll: '将显示的 {count} 个词全部加入', searchFailed: '搜索失败', firebaseDenied: '保存失败（权限不足）。请检查登录状态和 Firebase 项目设置。', loginRequired: '保存需要登录，请登录后重试。', saveLoginRequired: '保存需要登录', noWordsImported: '未找到可导入的单词'
     },
@@ -69,7 +70,7 @@ const TEXT = {
     quiz: { lookupWord: '查询这个单词', lookupHint: '在词典标签中查看 AI 出题词汇', next: '下一题', tapToFlip: '点击显示答案' },
   },
   ko: {
-    header: { dictionary: '사전', list: '목록', quiz: '퀴즈', chat: 'AI 대화', notebook: '노트', trash: '휴지통', login: '로그인', logout: '로그아웃', switchBook: '단어장 전환', language: '언어' },
+    header: { dictionary: '사전', list: '목록', analytics: '분석', quiz: '퀴즈', chat: 'AI 대화', notebook: '노트', trash: '휴지통', login: '로그인', logout: '로그아웃', switchBook: '단어장 전환', language: '언어' },
     app: {
       loading: '로딩 중...', searchPlaceholder: '영단어를 입력하세요...', search: '검색', searchMode: '검색 모드:', addWord: '"{word}"를 단어장에 추가', addAll: '표시된 {count}개 단어 모두 추가', searchFailed: '검색에 실패했습니다', firebaseDenied: '저장에 실패했습니다(권한 부족). 로그인 상태와 Firebase 프로젝트 설정을 확인하세요.', loginRequired: '저장하려면 로그인이 필요합니다. 로그인 후 다시 시도해 주세요.', saveLoginRequired: '저장하려면 로그인이 필요합니다', noWordsImported: '가져올 단어를 찾지 못했습니다'
     },
