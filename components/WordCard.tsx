@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { WordEntry, WordStatus } from '../types';
 
 interface WordCardProps {
@@ -18,7 +18,7 @@ const extractRootChips = (text: string) => {
 const truncate = (value: string, max = 88) =>
   value.length > max ? `${value.slice(0, max).trim()}…` : value;
 
-export const WordCard: React.FC<WordCardProps> = ({
+const WordCardComponent: React.FC<WordCardProps> = ({
   word,
   onDelete,
   onSearchRelated,
@@ -28,11 +28,21 @@ export const WordCard: React.FC<WordCardProps> = ({
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
-  
-  // スペースを含む場合は熟語（Idiom）とみなす
-  const isIdiom = word.word.trim().includes(' ');
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
-  const speakText = (text: string) => {
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncPreference = () => setPrefersReducedMotion(media.matches);
+    syncPreference();
+    media.addEventListener("change", syncPreference);
+    return () => media.removeEventListener("change", syncPreference);
+  }, []);
+
+  // スペースを含む場合は熟語（Idiom）とみなす
+  const isIdiom = useMemo(() => word.word.trim().includes(' '), [word.word]);
+  const roots = useMemo(() => extractRootChips(word.etymology), [word.etymology]);
+
+  const speakText = useCallback((text: string) => {
     if (!window.speechSynthesis) {
       alert("お使いのブラウザは音声読み上げに対応していません。");
       return;
@@ -50,17 +60,17 @@ export const WordCard: React.FC<WordCardProps> = ({
     utterance.onerror = () => setIsPlaying(false);
 
     window.speechSynthesis.speak(utterance);
-  };
+  }, []);
 
-  const handlePlayAudio = () => {
+  const handlePlayAudio = useCallback(() => {
     if (isPlaying) return;
     speakText(word.word);
-  };
+  }, [isPlaying, speakText, word.word]);
 
-  const playSentence = () => {
+  const playSentence = useCallback(() => {
     if (isPlaying) return;
     speakText(word.exampleSentence);
-  };
+  }, [isPlaying, speakText, word.exampleSentence]);
 
   const StatusButton = ({ status, icon, label, colorClass, activeClass }: { status: WordStatus, icon: string, label: string, colorClass: string, activeClass: string }) => (
     <button
@@ -81,12 +91,11 @@ export const WordCard: React.FC<WordCardProps> = ({
   );
 
   if (compact) {
-    const roots = extractRootChips(word.etymology);
     return (
       <article
         id={word.id}
         onClick={() => onOpenDetail?.(word)}
-        className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all space-y-3 cursor-pointer"
+        className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all motion-reduce:transition-none motion-reduce:hover:translate-y-0 space-y-3 cursor-pointer"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
@@ -139,7 +148,7 @@ export const WordCard: React.FC<WordCardProps> = ({
   return (
     <div 
       id={word.id}
-      className={`bg-white rounded-3xl shadow-sm border overflow-hidden hover:shadow-xl transition-all duration-300 group scroll-mt-24 ${
+      className={`bg-white rounded-3xl shadow-sm border overflow-hidden hover:shadow-xl transition-all duration-300 motion-reduce:transition-none group scroll-mt-24 ${
         word.status === 'mastered' ? 'border-emerald-200 shadow-emerald-50' : 
         word.status === 'learning' ? 'border-amber-200 shadow-amber-50' : 
         'border-slate-200'
@@ -190,15 +199,15 @@ export const WordCard: React.FC<WordCardProps> = ({
             <button 
               onClick={handlePlayAudio}
               disabled={isPlaying}
-              className={`flex items-center justify-center w-8 h-8 rounded-full transition-all flex-shrink-0 ${
+                className={`flex items-center justify-center w-8 h-8 rounded-full transition-all flex-shrink-0 ${
                 isPlaying 
                   ? 'bg-indigo-100 text-indigo-400' 
-                  : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg active:scale-95'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg active:scale-95 motion-reduce:active:scale-100'
               }`}
               title="発音を聞く"
             >
               {isPlaying ? (
-                <i className="fa-solid fa-spinner animate-spin text-xs"></i>
+                <i className={`fa-solid fa-spinner text-xs ${prefersReducedMotion ? "" : "animate-spin"}`}></i>
               ) : (
                 <i className="fa-solid fa-volume-high text-xs"></i>
               )}
@@ -332,10 +341,10 @@ export const WordCard: React.FC<WordCardProps> = ({
               <button 
                 onClick={playSentence}
                 disabled={isPlaying}
-                className="text-indigo-200 hover:text-white transition-colors"
+                className="text-indigo-200 hover:text-white transition-colors motion-reduce:transition-none"
                 title="例文を読み上げる"
               >
-                <i className={`fa-solid ${isPlaying ? 'fa-spinner animate-spin' : 'fa-volume-low'} text-xs`}></i>
+                <i className={`fa-solid ${isPlaying ? `fa-spinner ${prefersReducedMotion ? "" : "animate-spin"}` : 'fa-volume-low'} text-xs`}></i>
               </button>
             </div>
           </div>
@@ -344,7 +353,7 @@ export const WordCard: React.FC<WordCardProps> = ({
           </p>
           
           {word.exampleSentenceTranslation && (
-            <div className={`transition-all duration-300 overflow-hidden ${showTranslation ? 'max-h-24 opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0'}`}>
+            <div className={`transition-all duration-300 motion-reduce:transition-none overflow-hidden ${showTranslation ? 'max-h-24 opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0'}`}>
               <p className="text-sm text-indigo-200 font-medium border-t border-indigo-500/30 pt-2">
                 {word.exampleSentenceTranslation}
               </p>
@@ -443,3 +452,5 @@ export const WordCard: React.FC<WordCardProps> = ({
     </div>
   );
 };
+
+export const WordCard = React.memo(WordCardComponent);

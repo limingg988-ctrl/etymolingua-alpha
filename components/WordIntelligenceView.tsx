@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { WordEntry } from "../types";
+import { CollapsibleDeferredSection } from "./CollapsibleDeferredSection";
+import { SemanticWebPanel } from "./detail/SemanticWebPanel";
 
 interface WordIntelligenceViewProps {
   word: WordEntry;
@@ -31,12 +33,15 @@ export const WordIntelligenceView: React.FC<WordIntelligenceViewProps> = ({
   onStartQuiz,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isSemanticOpen, setIsSemanticOpen] = useState(true);
+  const [isReducedMotion, setIsReducedMotion] = useState(false);
 
   useEffect(() => {
-    const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches;
-    setIsSemanticOpen(!isMobile);
-  }, [word.id]);
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncMotionPreference = () => setIsReducedMotion(media.matches);
+    syncMotionPreference();
+    media.addEventListener("change", syncMotionPreference);
+    return () => media.removeEventListener("change", syncMotionPreference);
+  }, []);
 
   const roots = useMemo(() => parseRoots(word.etymology), [word.etymology]);
 
@@ -159,43 +164,15 @@ export const WordIntelligenceView: React.FC<WordIntelligenceViewProps> = ({
             <p className="text-slate-600 text-sm leading-relaxed">{word.etymology}</p>
           </section>
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Semantic Web</h3>
-              <button
-                type="button"
-                onClick={() => setIsSemanticOpen((prev) => !prev)}
-                className="md:hidden text-xs font-semibold text-indigo-600"
-              >
-                {isSemanticOpen ? "折りたたむ" : "展開する"}
-              </button>
+          <CollapsibleDeferredSection
+            title="Semantic Web"
+            subtitle="重い関連ノード描画は展開時に遅延実行します"
+            defaultOpen={false}
+          >
+            <div className={isReducedMotion ? "motion-reduce:animate-none" : ""}>
+              <SemanticWebPanel semanticNodes={semanticNodes} onSearchRelated={onSearchRelated} />
             </div>
-
-            {isSemanticOpen && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {semanticNodes.map((node) => (
-                  <button
-                    key={node.id}
-                    type="button"
-                    onClick={() => onSearchRelated?.(node.term)}
-                    className={`text-left p-3 rounded-xl border transition-colors ${
-                      node.group === "synonym"
-                        ? "bg-indigo-50 border-indigo-100 hover:bg-indigo-100"
-                        : node.group === "idiom"
-                          ? "bg-amber-50 border-amber-100 hover:bg-amber-100"
-                          : "bg-slate-50 border-slate-200 hover:bg-slate-100"
-                    }`}
-                  >
-                    <p className="text-sm font-bold text-slate-900">{node.term}</p>
-                    {node.translation && <p className="text-xs text-slate-500">{node.translation}</p>}
-                  </button>
-                ))}
-                {semanticNodes.length === 0 && (
-                  <p className="text-sm text-slate-500">関連ノードがありません。</p>
-                )}
-              </div>
-            )}
-          </section>
+          </CollapsibleDeferredSection>
 
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Usage History</h3>

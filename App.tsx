@@ -42,6 +42,8 @@ const App: React.FC = () => {
   const WORDS_PAGE_SIZE = 30;
   const INITIAL_VISIBLE_COUNT = 20;
   const VISIBLE_COUNT_STEP = 20;
+  const INITIAL_SEARCH_RESULTS_VISIBLE = 3;
+  const SEARCH_RESULTS_VISIBLE_STEP = 3;
   const [isGlobalLoading, setIsGlobalLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewMode>("search");
   const [user, setUser] = useState<any>(null);
@@ -76,6 +78,7 @@ const App: React.FC = () => {
   const [listSort, setListSort] = useState<"newest" | "oldest" | "wordAsc" | "status">("newest");
   const [selectedRootChip, setSelectedRootChip] = useState<string>("all");
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
+  const [visibleSearchResultsCount, setVisibleSearchResultsCount] = useState(INITIAL_SEARCH_RESULTS_VISIBLE);
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
@@ -220,6 +223,10 @@ const App: React.FC = () => {
   }, [listSearchQuery, listSort, selectedRootChip]);
 
   useEffect(() => {
+    setVisibleSearchResultsCount(INITIAL_SEARCH_RESULTS_VISIBLE);
+  }, [searchQuery, searchFocus]);
+
+  useEffect(() => {
     if (!selectedWordId) return;
     const stillExists = words.some((word) => word.id === selectedWordId && !word.isTrashed);
     if (!stillExists) setSelectedWordId(null);
@@ -292,6 +299,7 @@ const App: React.FC = () => {
 
     setIsSearching(true);
     setSearchResults([]);
+    setVisibleSearchResultsCount(INITIAL_SEARCH_RESULTS_VISIBLE);
 
     const results: GeminiResponse[] = [];
     for (const query of queries) {
@@ -304,7 +312,7 @@ const App: React.FC = () => {
     }
     setSearchResults(results);
     setIsSearching(false);
-  }, [language, parseSearchQueries, searchFocus, searchQuery, showToast]);
+  }, [INITIAL_SEARCH_RESULTS_VISIBLE, language, parseSearchQueries, searchFocus, searchQuery, showToast]);
 
   const handleStartDailyQuiz = useCallback((selectedWords: WordEntry[]) => {
     setQuizTargetWords(selectedWords);
@@ -526,6 +534,11 @@ const App: React.FC = () => {
   const visibleWords = useMemo(
     () => sortedListWords.slice(0, visibleCount),
     [sortedListWords, visibleCount],
+  );
+
+  const visibleSearchResults = useMemo(
+    () => searchResults.slice(0, visibleSearchResultsCount),
+    [searchResults, visibleSearchResultsCount],
   );
 
   const selectedListWord = useMemo(
@@ -759,7 +772,7 @@ const App: React.FC = () => {
               複数検索は「, / 改行 / ;」区切りで入力できます（例: take off, resilience, look up）。「/」を含む語は1語として扱います。
             </p>
             {isSearching && <SkeletonLoader />}
-            {searchResults.map((result, idx) => (
+            {visibleSearchResults.map((result, idx) => (
               <div key={`${result.word}-${idx}`} className="space-y-2 ui-glass ui-rounded-panel p-3">
                 <WordCard
                   word={
@@ -779,6 +792,19 @@ const App: React.FC = () => {
                 </button>
               </div>
             ))}
+            {searchResults.length > visibleSearchResults.length && (
+              <button
+                type="button"
+                onClick={() =>
+                  setVisibleSearchResultsCount((prev) =>
+                    Math.min(prev + SEARCH_RESULTS_VISIBLE_STEP, searchResults.length),
+                  )
+                }
+                className="w-full bg-white border border-surface-200 text-surface-700 py-3 rounded-2xl font-bold"
+              >
+                検索結果をさらに表示
+              </button>
+            )}
             {searchResults.length > 1 && (
               <button
                 onClick={async () => {

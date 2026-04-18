@@ -1,5 +1,7 @@
 import React, { useMemo } from "react";
 import { WordEntry, WordStatus } from "../types";
+import { CollapsibleDeferredSection } from "./CollapsibleDeferredSection";
+import { LearningHeatmapPanel } from "./analytics/LearningHeatmapPanel";
 
 interface AnalyticsViewProps {
   words: WordEntry[];
@@ -169,25 +171,17 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ words }) => {
         />
       </div>
 
-      <article className="ui-glass ui-rounded-panel p-4 border border-slate-200/80 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-slate-800">一貫性ヒートマップ（直近28日）</h3>
-          <span className="text-xs text-slate-500">日次アクティビティの簡易表示</span>
-        </div>
-        <div className="grid grid-cols-7 gap-2">
-          {heatmap.map((cell) => (
-            <div
-              key={cell.day}
-              className={`h-9 rounded-md border ${getIntensityClass(cell.count)} relative group`}
-              title={`${formatDay(cell.day)}: ${cell.count}件`}
-            >
-              <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                {formatDay(cell.day)} ({cell.count})
-              </span>
-            </div>
-          ))}
-        </div>
-      </article>
+      <CollapsibleDeferredSection
+        title="Learning Heatmap"
+        subtitle="チャート描画は展開時に遅延レンダリングします"
+        defaultOpen={false}
+      >
+        <LearningHeatmapPanel
+          heatmap={heatmap}
+          getIntensityClass={getIntensityClass}
+          formatDay={formatDay}
+        />
+      </CollapsibleDeferredSection>
 
       <article className="ui-glass ui-rounded-panel p-4 border border-slate-200/80">
         <h3 className="font-bold text-slate-800 mb-3">難単語リスト（mastery低い順）</h3>
