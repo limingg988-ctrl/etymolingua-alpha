@@ -128,7 +128,9 @@ const TopBar: React.FC<HeaderProps> = ({
       {user ? (
         <div className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
           {user.photoURL ? (
-            <img src={user.photoURL} alt="User" className="w-6 h-6 rounded-full" />
+            <span className="w-6 h-6 rounded-full overflow-hidden inline-flex shrink-0 aspect-square">
+              <img src={user.photoURL} alt="User" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+            </span>
           ) : (
             <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
               {user.email?.[0]?.toUpperCase() || "U"}
