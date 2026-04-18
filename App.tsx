@@ -13,6 +13,7 @@ import { UsageGuide } from "./components/UsageGuide";
 import { Toast } from "./components/Toast";
 import { SkeletonLoader } from "./components/SkeletonLoader";
 import { LoginConfirmModal } from "./components/LoginConfirmModal";
+import { WordIntelligenceView } from "./components/WordIntelligenceView";
 import {
   WordEntry,
   NoteEntry,
@@ -72,6 +73,7 @@ const App: React.FC = () => {
   const [listSearchQuery, setListSearchQuery] = useState("");
   const [listSort, setListSort] = useState<"newest" | "oldest" | "wordAsc" | "status">("newest");
   const [selectedRootChip, setSelectedRootChip] = useState<string>("all");
+  const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
@@ -214,6 +216,12 @@ const App: React.FC = () => {
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [listSearchQuery, listSort, selectedRootChip]);
+
+  useEffect(() => {
+    if (!selectedWordId) return;
+    const stillExists = words.some((word) => word.id === selectedWordId && !word.isTrashed);
+    if (!stillExists) setSelectedWordId(null);
+  }, [selectedWordId, words]);
 
   const handleLogin = async () => {
     try {
@@ -518,6 +526,11 @@ const App: React.FC = () => {
     [sortedListWords, visibleCount],
   );
 
+  const selectedListWord = useMemo(
+    () => activeWords.find((word) => word.id === selectedWordId) || null,
+    [activeWords, selectedWordId],
+  );
+
   // 表示用の単語帳名を安定して取得する
   const currentBookName = useMemo(() => {
     if (currentBookId === "all") return "全単語（ゴミ箱除く）";
@@ -528,13 +541,16 @@ const App: React.FC = () => {
   const handleUpdateWordStatus = useCallback(
     async (id: string, status: WordStatus) => {
       if (!ensureWritableSession()) return;
+      const snapshot = words;
+      setWords((prev) => prev.map((word) => (word.id === id ? { ...word, status } : word)));
       try {
         await dbService.updateWord(id, { status });
       } catch (error: any) {
+        setWords(snapshot);
         showToast(getFirebaseErrorMessage(error), "error");
       }
     },
-    [ensureWritableSession, getFirebaseErrorMessage, showToast],
+    [ensureWritableSession, getFirebaseErrorMessage, showToast, words],
   );
 
   // 単語帳選択: 未知IDでも即座に "all" / default へ戻さず、選択IDを維持する
@@ -783,72 +799,88 @@ const App: React.FC = () => {
         )}
         {currentView === "list" && (
           <div className="view-stack">
-            <div className="ui-glass ui-rounded-panel p-3 space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                {listRootChips.map((root) => (
-                  <button
-                    key={root}
-                    type="button"
-                    onClick={() => setSelectedRootChip(root)}
-                    className={`px-3 py-1.5 text-xs rounded-full border font-bold transition-colors ${
-                      selectedRootChip === root
-                        ? "bg-indigo-600 text-white border-indigo-600"
-                        : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
-                    }`}
-                  >
-                    {root === "all" ? "すべてのroot" : root}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-col md:flex-row gap-2">
-                <input
-                  type="text"
-                  value={listSearchQuery}
-                  onChange={(e) => setListSearchQuery(e.target.value)}
-                  placeholder="見出し / 意味 / 語源で検索"
-                  className="flex-1 p-3 rounded-xl border border-surface-200 bg-white text-surface-900 outline-none focus:border-primary-500"
-                />
-                <select
-                  value={listSort}
-                  onChange={(e) =>
-                    setListSort(e.target.value as "newest" | "oldest" | "wordAsc" | "status")
-                  }
-                  className="md:w-52 p-3 rounded-xl border border-surface-200 bg-white text-surface-900 outline-none focus:border-primary-500"
-                >
-                  <option value="newest">新しい順</option>
-                  <option value="oldest">古い順</option>
-                  <option value="wordAsc">見出しA→Z</option>
-                  <option value="status">ステータス順</option>
-                </select>
-              </div>
-            </div>
-            <div className="text-sm text-surface-500 font-medium">
-              {`${visibleWords.length} / ${sortedListWords.length}`}
-            </div>
-            {visibleWords.map((word) => (
-              <WordCard
-                key={word.id}
-                word={word}
-                onDelete={handleMoveWordToTrash}
+            {selectedListWord ? (
+              <WordIntelligenceView
+                word={selectedListWord}
+                onBack={() => setSelectedWordId(null)}
                 onSearchRelated={handleSearchWord}
-                onStatusChange={handleUpdateWordStatus}
-                compact
-                onOpenDetail={(target) => handleSearchWord(target.word)}
+                onMarkMastered={() => handleUpdateWordStatus(selectedListWord.id, "mastered")}
+                onPractice={() => handleUpdateWordStatus(selectedListWord.id, "learning")}
+                onStartQuiz={() => {
+                  setQuizTargetWords([selectedListWord]);
+                  setCurrentView("quiz");
+                }}
               />
-            ))}
-            {isWordsLoading && <SkeletonLoader />}
-            {sortedListWords.length > visibleWords.length && (
-              <button
-                type="button"
-                onClick={() =>
-                  setVisibleCount((prev) =>
-                    Math.min(prev + VISIBLE_COUNT_STEP, sortedListWords.length),
-                  )
-                }
-                className="w-full bg-white border border-surface-200 text-surface-700 py-3 rounded-2xl font-bold"
-              >
-                さらに表示
-              </button>
+            ) : (
+              <>
+                <div className="ui-glass ui-rounded-panel p-3 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {listRootChips.map((root) => (
+                      <button
+                        key={root}
+                        type="button"
+                        onClick={() => setSelectedRootChip(root)}
+                        className={`px-3 py-1.5 text-xs rounded-full border font-bold transition-colors ${
+                          selectedRootChip === root
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
+                        }`}
+                      >
+                        {root === "all" ? "すべてのroot" : root}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-col md:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={listSearchQuery}
+                      onChange={(e) => setListSearchQuery(e.target.value)}
+                      placeholder="見出し / 意味 / 語源で検索"
+                      className="flex-1 p-3 rounded-xl border border-surface-200 bg-white text-surface-900 outline-none focus:border-primary-500"
+                    />
+                    <select
+                      value={listSort}
+                      onChange={(e) =>
+                        setListSort(e.target.value as "newest" | "oldest" | "wordAsc" | "status")
+                      }
+                      className="md:w-52 p-3 rounded-xl border border-surface-200 bg-white text-surface-900 outline-none focus:border-primary-500"
+                    >
+                      <option value="newest">新しい順</option>
+                      <option value="oldest">古い順</option>
+                      <option value="wordAsc">見出しA→Z</option>
+                      <option value="status">ステータス順</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="text-sm text-surface-500 font-medium">
+                  {`${visibleWords.length} / ${sortedListWords.length}`}
+                </div>
+                {visibleWords.map((word) => (
+                  <WordCard
+                    key={word.id}
+                    word={word}
+                    onDelete={handleMoveWordToTrash}
+                    onSearchRelated={handleSearchWord}
+                    onStatusChange={handleUpdateWordStatus}
+                    compact
+                    onOpenDetail={(target) => setSelectedWordId(target.id)}
+                  />
+                ))}
+                {isWordsLoading && <SkeletonLoader />}
+                {sortedListWords.length > visibleWords.length && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVisibleCount((prev) =>
+                        Math.min(prev + VISIBLE_COUNT_STEP, sortedListWords.length),
+                      )
+                    }
+                    className="w-full bg-white border border-surface-200 text-surface-700 py-3 rounded-2xl font-bold"
+                  >
+                    さらに表示
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
