@@ -6,9 +6,26 @@ interface WordCardProps {
   onDelete?: (id: string) => void;
   onSearchRelated?: (word: string) => void;
   onStatusChange?: (id: string, status: WordStatus) => void;
+  compact?: boolean;
+  onOpenDetail?: (word: WordEntry) => void;
 }
 
-export const WordCard: React.FC<WordCardProps> = ({ word, onDelete, onSearchRelated, onStatusChange }) => {
+const extractRootChips = (text: string) => {
+  const roots = text.match(/-[a-z]{2,}/gi) || [];
+  return Array.from(new Set(roots.map((root) => root.toLowerCase()))).slice(0, 3);
+};
+
+const truncate = (value: string, max = 88) =>
+  value.length > max ? `${value.slice(0, max).trim()}…` : value;
+
+export const WordCard: React.FC<WordCardProps> = ({
+  word,
+  onDelete,
+  onSearchRelated,
+  onStatusChange,
+  compact = false,
+  onOpenDetail,
+}) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
   
@@ -62,6 +79,89 @@ export const WordCard: React.FC<WordCardProps> = ({ word, onDelete, onSearchRela
       <span>{label}</span>
     </button>
   );
+
+  if (compact) {
+    const roots = extractRootChips(word.etymology);
+    return (
+      <article
+        id={word.id}
+        className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all space-y-3"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <h3 className="text-lg font-extrabold text-slate-900 leading-tight">{word.word}</h3>
+            <p className="text-sm text-slate-600">{word.meaning}</p>
+          </div>
+          <div className="flex gap-1 bg-slate-100/90 p-1 rounded-lg border border-slate-200 shrink-0">
+            <StatusButton
+              status="unknown"
+              icon="fa-xmark"
+              label="未"
+              colorClass="text-red-500"
+              activeClass="bg-red-500 text-white border border-red-600 ring-2 ring-red-100"
+            />
+            <StatusButton
+              status="learning"
+              icon="fa-play"
+              label="中"
+              colorClass="text-amber-500"
+              activeClass="bg-amber-500 text-white border border-amber-600 ring-2 ring-amber-100"
+            />
+            <StatusButton
+              status="mastered"
+              icon="fa-check"
+              label="済"
+              colorClass="text-emerald-500"
+              activeClass="bg-emerald-500 text-white border border-emerald-600 ring-2 ring-emerald-100"
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {roots.map((root) => (
+            <button
+              key={root}
+              type="button"
+              onClick={() => onSearchRelated?.(root)}
+              className="text-[11px] px-2 py-1 rounded-full border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+            >
+              {root}
+            </button>
+          ))}
+          {roots.length === 0 && (
+            <span className="text-[11px] px-2 py-1 rounded-full border border-slate-200 text-slate-500 bg-slate-50">
+              root未抽出
+            </span>
+          )}
+        </div>
+        <div className="text-sm text-slate-700 bg-slate-50 rounded-xl p-3 leading-relaxed">
+          <p className="font-semibold text-slate-500 text-[11px] uppercase tracking-wider mb-1">語源分解</p>
+          <p>{truncate(word.etymology, 100)}</p>
+        </div>
+        <p className="text-sm text-slate-600 leading-relaxed">{truncate(word.logic || word.mnemonic, 90)}</p>
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-[11px] text-slate-400">
+            {new Date(word.timestamp).toLocaleDateString()}
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onSearchRelated?.(word.word)}
+              className="text-xs px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+            >
+              関連検索
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenDetail?.(word)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-slate-50"
+            >
+              詳細
+            </button>
+          </div>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <div 
