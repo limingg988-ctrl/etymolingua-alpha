@@ -39,3 +39,7 @@ This repository includes a production-safe Firestore rules file at `firestore.ru
 - Signed-in users can only create/read/update/delete documents where `userId === request.auth.uid`.
 - Collections covered: `words`, `books`, `notes`.
 - All other collections are denied by default.
+
+## Firebase Auth operations checklist
+
+- See `docs/firebase-auth-operations.md` for pre-release checks (authorized domains, Google provider, OAuth consent screen, authDomain alignment), client error logging, and a real-device Popup/Redirect validation matrix.
