@@ -3,13 +3,13 @@ import React from 'react';
 interface LoginConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onPopupConfirm: () => void;
   onRedirectConfirm: () => void;
   isLoading?: boolean;
 }
 
 export const LoginConfirmModal: React.FC<LoginConfirmModalProps> = ({ 
-  isOpen, onClose, onConfirm, onRedirectConfirm, isLoading = false 
+  isOpen, onClose, onPopupConfirm, onRedirectConfirm, isLoading = false 
 }) => {
   if (!isOpen) return null;
 
@@ -36,7 +36,7 @@ export const LoginConfirmModal: React.FC<LoginConfirmModalProps> = ({
         <div className="flex flex-col gap-3 mb-4">
            {/* Popup Login */}
            <button 
-            onClick={onConfirm}
+            onClick={onPopupConfirm}
             disabled={isLoading}
             className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
@@ -70,7 +70,7 @@ export const LoginConfirmModal: React.FC<LoginConfirmModalProps> = ({
         </button>
 
         <p className="text-[10px] text-slate-400 text-center mt-2">
-            ※ポップアップがブロックされる場合はリダイレクトをご利用ください
+            ※ポップアップがブロックされる場合は「リダイレクトでログイン」を選択してください
         </p>
       </div>
     </div>

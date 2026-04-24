@@ -3,6 +3,8 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged,
   User,
@@ -55,7 +57,9 @@ const db = initializeFirestore(app, {
 export const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-export const loginWithGoogle = () => signInWithPopup(auth, provider);
+export const loginWithGooglePopup = () => signInWithPopup(auth, provider);
+export const loginWithGoogleRedirect = () => signInWithRedirect(auth, provider);
+export const consumeRedirectResult = () => getRedirectResult(auth);
 export const logout = () => signOut(auth);
 
 const waitForAuthReady = async (): Promise<User | null> => {
