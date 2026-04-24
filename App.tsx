@@ -23,7 +23,14 @@ import {
   WordStatus,
 } from "./types";
 import { fetchWordDetails, SearchFocus } from "./services/geminiService";
-import { dbService, auth, loginWithGoogle, logout } from "./services/firebase";
+import {
+  dbService,
+  auth,
+  loginWithGooglePopup,
+  loginWithGoogleRedirect,
+  consumeRedirectResult,
+  logout,
+} from "./services/firebase";
 import { exportToJSON } from "./services/csvExportService";
 import { onAuthStateChanged } from "firebase/auth";
 import { AppLanguage, t } from "./services/i18n";
@@ -90,6 +97,9 @@ const App: React.FC = () => {
     }
     if (error?.message === "auth-required") {
       return t(language, "app.loginRequired");
+    }
+    if (error?.code) {
+      return `Firebase Auth Error: ${error.code}`;
     }
     return error?.message || "操作に失敗しました";
   }, [language]);
@@ -210,6 +220,21 @@ const App: React.FC = () => {
   }, [loadData]);
 
   useEffect(() => {
+    const readRedirectResult = async () => {
+      try {
+        const result = await consumeRedirectResult();
+        if (!result) return;
+        setShowLogin(false);
+        showToast("リダイレクトでログインしました", "success");
+      } catch (error: any) {
+        showToast(`リダイレクトログインに失敗しました: ${getFirebaseErrorMessage(error)}`, "error");
+      }
+    };
+
+    readRedirectResult();
+  }, [getFirebaseErrorMessage, showToast]);
+
+  useEffect(() => {
     if (isGlobalLoading) return;
     loadFirstWordsPage(currentBookId);
   }, [currentBookId, isGlobalLoading, loadFirstWordsPage]);
@@ -232,13 +257,21 @@ const App: React.FC = () => {
     if (!stillExists) setSelectedWordId(null);
   }, [selectedWordId, words]);
 
-  const handleLogin = async () => {
+  const handlePopupLogin = async () => {
     try {
-      await loginWithGoogle();
+      await loginWithGooglePopup();
       setShowLogin(false);
-      showToast("ログインしました", "success");
-    } catch (e) {
-      showToast("ログインに失敗しました", "error");
+      showToast("ポップアップでログインしました", "success");
+    } catch (error: any) {
+      showToast(`ポップアップログインに失敗しました: ${getFirebaseErrorMessage(error)}`, "error");
+    }
+  };
+
+  const handleRedirectLogin = async () => {
+    try {
+      await loginWithGoogleRedirect();
+    } catch (error: any) {
+      showToast(`リダイレクトログインに失敗しました: ${getFirebaseErrorMessage(error)}`, "error");
     }
   };
 
@@ -979,8 +1012,8 @@ const App: React.FC = () => {
       <LoginConfirmModal
         isOpen={showLogin}
         onClose={() => setShowLogin(false)}
-        onConfirm={handleLogin}
-        onRedirectConfirm={handleLogin}
+        onPopupConfirm={handlePopupLogin}
+        onRedirectConfirm={handleRedirectLogin}
       />
       <Toast
         message={toast.message}
