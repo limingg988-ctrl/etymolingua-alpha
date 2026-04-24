@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { AppLanguage, getLanguageLabel, t } from "../services/i18n";
 
 type ViewMode =
@@ -63,7 +63,7 @@ const SideNav: React.FC<Pick<HeaderProps, "currentView" | "onChangeView" | "lang
   </aside>
 );
 
-const TopBar: React.FC<HeaderProps> = ({
+const DesktopTopBar: React.FC<HeaderProps> = ({
   onChangeView,
   onOpenBooks,
   currentBookName,
@@ -76,24 +76,21 @@ const TopBar: React.FC<HeaderProps> = ({
   language,
   onLanguageChange,
 }) => (
-  <div className="h-16 px-4 flex items-center justify-between gap-3">
+  <div className="hidden md:flex h-16 px-4 items-center justify-between gap-3">
     <div className="flex items-center gap-2 sm:gap-4 min-w-0">
       <button
         onClick={() => onChangeView("search")}
         className="flex items-center gap-2 hover:opacity-80 transition-opacity focus:outline-none"
       >
-        <div className="bg-indigo-600 p-2 rounded-lg shadow-md shadow-indigo-200 hidden sm:block">
+        <div className="bg-indigo-600 p-2 rounded-lg shadow-md shadow-indigo-200">
           <i className="fa-solid fa-book-sparkles text-white text-xl"></i>
         </div>
-        <span className="font-black text-slate-800 text-lg hidden sm:block tracking-tight">Etymolingua-alpha</span>
-        <span className="font-black text-indigo-600 text-xl sm:hidden">
-          <i className="fa-solid fa-book-sparkles"></i>
-        </span>
+        <span className="font-black text-slate-800 text-lg tracking-tight">Etymolingua-alpha</span>
       </button>
 
       <button
         onClick={onOpenBooks}
-        className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 border border-transparent hover:border-indigo-200 rounded-xl transition-all group max-w-[220px]"
+        className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 border border-transparent hover:border-indigo-200 rounded-xl transition-all group max-w-[220px]"
         title={t(language, "header.switchBook")}
       >
         <i className="fa-solid fa-book text-slate-400 group-hover:text-indigo-500"></i>
@@ -102,7 +99,7 @@ const TopBar: React.FC<HeaderProps> = ({
       </button>
     </div>
 
-    <div className="hidden md:flex items-center gap-2 flex-1 max-w-xl">
+    <div className="hidden lg:flex items-center gap-2 flex-1 max-w-xl">
       <div className="flex items-center gap-2 w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2">
         <i className="fa-solid fa-magnifying-glass text-slate-400"></i>
         <input
@@ -117,14 +114,6 @@ const TopBar: React.FC<HeaderProps> = ({
     </div>
 
     <div className="flex items-center gap-2 sm:gap-3">
-      <button
-        onClick={onOpenBooks}
-        className="sm:hidden w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 rounded-full hover:bg-slate-100"
-        title={t(language, "header.switchBook")}
-      >
-        <i className="fa-solid fa-book"></i>
-      </button>
-
       {user ? (
         <div className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
           {user.photoURL ? (
@@ -153,7 +142,7 @@ const TopBar: React.FC<HeaderProps> = ({
         </button>
       )}
 
-      <label className="hidden lg:flex items-center gap-1 text-xs text-slate-500 font-bold">
+      <label className="hidden xl:flex items-center gap-1 text-xs text-slate-500 font-bold">
         <i className="fa-solid fa-language"></i>
         <span>{t(language, "header.language")}</span>
         <select
@@ -172,7 +161,7 @@ const TopBar: React.FC<HeaderProps> = ({
 
       <button
         onClick={onRepairBooks}
-        className="hidden sm:flex w-8 h-8 items-center justify-center text-slate-400 hover:text-amber-600 transition-colors rounded-full hover:bg-slate-100"
+        className="w-8 h-8 items-center justify-center text-slate-400 hover:text-amber-600 transition-colors rounded-full hover:bg-slate-100 hidden lg:flex"
         title="欠損単語帳を修復する"
       >
         <i className="fa-solid fa-wrench"></i>
@@ -195,32 +184,146 @@ const TopBar: React.FC<HeaderProps> = ({
   </div>
 );
 
+const MobileTopBar: React.FC<HeaderProps> = ({
+  currentView,
+  onChangeView,
+  onOpenBooks,
+  user,
+  onLogin,
+  onLogout,
+  onRepairBooks,
+  onOpenUsage,
+  onOpenSettings,
+  language,
+  onLanguageChange,
+}) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  return (
+    <>
+      <div className="md:hidden h-16 px-3 flex items-center justify-between gap-2">
+        <button
+          onClick={() => onChangeView("search")}
+          className="min-w-0 flex items-center gap-2 hover:opacity-80 transition-opacity"
+        >
+          <div className="bg-indigo-600 p-2 rounded-lg shadow-md shadow-indigo-200">
+            <i className="fa-solid fa-book-sparkles text-white text-lg"></i>
+          </div>
+          <span className="font-black text-slate-800 text-base tracking-tight truncate">Etymolingua</span>
+        </button>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {user ? (
+            <button
+              onClick={onLogout}
+              className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 bg-white"
+              title={t(language, "header.logout")}
+            >
+              {user.photoURL ? (
+                <img src={user.photoURL} alt="User" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-600 text-xs font-bold">
+                  {user.email?.[0]?.toUpperCase() || "U"}
+                </span>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={onLogin}
+              className="bg-indigo-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm"
+            >
+              Googleでログイン
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen(true)}
+            className="w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600"
+            aria-label="メニューを開く"
+          >
+            <i className="fa-solid fa-bars"></i>
+          </button>
+        </div>
+      </div>
+
+      {!user && (
+        <div className="md:hidden px-3 pb-2">
+          <button
+            onClick={onLogin}
+            className="w-full bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm"
+          >
+            <i className="fa-brands fa-google mr-2"></i>Googleでログイン
+          </button>
+        </div>
+      )}
+
+      {isMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-[70] bg-slate-900/45" onClick={() => setIsMenuOpen(false)}>
+          <div
+            className="absolute bottom-0 left-0 right-0 rounded-t-3xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-4" />
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => {
+                    onChangeView(item.key);
+                    setIsMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-3 rounded-xl border text-sm font-semibold ${
+                    currentView === item.key ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-600"
+                  }`}
+                >
+                  <i className={item.icon}></i>
+                  <span>{t(language, item.labelKey)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <button onClick={onOpenBooks} className="w-full text-left px-3 py-3 rounded-xl border border-slate-200">
+                <i className="fa-solid fa-book mr-2 text-slate-500"></i>単語帳を選択
+              </button>
+              <button onClick={onRepairBooks} className="w-full text-left px-3 py-3 rounded-xl border border-slate-200">
+                <i className="fa-solid fa-wrench mr-2 text-slate-500"></i>欠損単語帳を修復
+              </button>
+              <button onClick={onOpenUsage} className="w-full text-left px-3 py-3 rounded-xl border border-slate-200">
+                <i className="fa-regular fa-circle-question mr-2 text-slate-500"></i>使い方
+              </button>
+              <button onClick={onOpenSettings} className="w-full text-left px-3 py-3 rounded-xl border border-slate-200">
+                <i className="fa-solid fa-gear mr-2 text-slate-500"></i>設定
+              </button>
+            </div>
+            <label className="flex items-center justify-between mt-4 text-sm font-semibold text-slate-600">
+              <span>言語</span>
+              <select
+                value={language}
+                onChange={(e) => onLanguageChange(e.target.value as AppLanguage)}
+                className="border border-slate-200 rounded-lg px-3 py-2 bg-white"
+              >
+                {(["ja", "en", "zh-CN", "ko"] as AppLanguage[]).map((lang) => (
+                  <option key={lang} value={lang}>
+                    {getLanguageLabel(lang)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 export const Header: React.FC<HeaderProps> = (props) => {
   const { currentView, onChangeView, language } = props;
 
   return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 transition-all">
-      <TopBar {...props} />
+    <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 transition-all">
+      <DesktopTopBar {...props} />
+      <MobileTopBar {...props} />
       <SideNav currentView={currentView} onChangeView={onChangeView} language={language} />
-
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-50 pb-safe overflow-x-auto shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        {NAV_ITEMS.filter((item) => item.key !== "notebook").map((item) => (
-          <button
-            key={item.key}
-            onClick={() => onChangeView(item.key)}
-            className={`flex flex-col items-center p-2 min-w-[3.5rem] rounded-xl ${
-              currentView === item.key
-                ? item.key === "trash"
-                  ? "text-red-500 bg-red-50"
-                  : "text-indigo-600 bg-indigo-50"
-                : "text-slate-400"
-            }`}
-          >
-            <i className={`${item.icon} text-lg mb-1`}></i>
-            <span className="text-[10px] font-bold">{t(language, item.labelKey)}</span>
-          </button>
-        ))}
-      </div>
     </header>
   );
 };

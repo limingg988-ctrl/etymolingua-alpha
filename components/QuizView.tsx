@@ -615,8 +615,8 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
   const optionLabels = ['A', 'B', 'C', 'D'];
 
   return (
-    <div className="max-w-3xl mx-auto animate-in fade-in duration-300 pb-20">
-      <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 -mx-2 px-2 pt-2 pb-4 mb-6 border-b border-slate-200/70">
+    <div className="max-w-3xl mx-auto animate-in fade-in duration-300 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-20 overflow-x-hidden">
+      <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 -mx-1 md:-mx-2 px-1 md:px-2 pt-2 pb-3 md:pb-4 mb-4 md:mb-6 border-b border-slate-200/70">
         <div className="flex justify-between items-center gap-3 mb-3">
           <button
             onClick={onExit}
@@ -667,7 +667,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
       </div>
 
       {/* Flip Card Container */}
-      <div className="relative w-full perspective-1000 min-h-[500px]">
+      <div className="relative w-full perspective-1000 min-h-[460px] md:min-h-[500px]">
          <div 
            className={`relative w-full grid grid-cols-1 grid-rows-1 transition-transform duration-700 [transform-style:preserve-3d] ${
              isFlipped ? '[transform:rotateY(180deg)]' : ''

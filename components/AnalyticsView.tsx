@@ -42,7 +42,7 @@ const StatCard: React.FC<{ title: string; value: string; subtitle: string; icon:
   subtitle,
   icon,
 }) => (
-  <article className="ui-glass ui-rounded-panel p-4 border border-slate-200/80">
+  <article className="ui-glass ui-rounded-panel p-3 md:p-4 border border-slate-200/80">
     <div className="flex items-start justify-between gap-3">
       <div>
         <p className="text-xs text-slate-500 font-bold tracking-wide uppercase">{title}</p>
@@ -149,8 +149,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ words }) => {
   }
 
   return (
-    <section className="view-stack">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <section className="view-stack max-w-full overflow-x-hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <StatCard
           title="総習得数"
           value={`${masteredCount}`}
@@ -183,7 +183,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ words }) => {
         />
       </CollapsibleDeferredSection>
 
-      <article className="ui-glass ui-rounded-panel p-4 border border-slate-200/80">
+      <article className="ui-glass ui-rounded-panel p-3 md:p-4 border border-slate-200/80">
         <h3 className="font-bold text-slate-800 mb-3">難単語リスト（mastery低い順）</h3>
         <div className="space-y-2">
           {difficultWords.map((word, index) => (
