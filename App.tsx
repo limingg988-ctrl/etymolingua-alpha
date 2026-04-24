@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Header } from "./components/Header";
+import { BottomNav } from "./components/BottomNav";
 import { WordCard } from "./components/WordCard";
 import { StatsDashboard } from "./components/StatsDashboard";
 import { ChatAssistant } from "./components/ChatAssistant";
@@ -760,7 +761,7 @@ const App: React.FC = () => {
     return <div className="p-20 text-center text-surface-700">{t(language, "app.loading")}</div>;
 
   return (
-    <div className="min-h-screen bg-surface-50">
+    <div className="min-h-screen bg-surface-50 overflow-x-hidden">
       <Header
         currentView={currentView}
         onChangeView={setCurrentView}
@@ -775,10 +776,10 @@ const App: React.FC = () => {
         language={language}
         onLanguageChange={setLanguage}
       />
-      <main className="app-main-shell md:pl-56">
+      <main className="app-main-shell md:pl-56 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8">
           <section className="app-main-container">
         {currentView === "search" && (
-          <div className="view-stack">
+          <div className="view-stack mobile-view-shell">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -880,7 +881,7 @@ const App: React.FC = () => {
           </div>
         )}
         {currentView === "list" && (
-          <div className="view-stack">
+          <div className="view-stack mobile-view-shell">
             {selectedListWord ? (
               <WordIntelligenceView
                 word={selectedListWord}
@@ -970,7 +971,7 @@ const App: React.FC = () => {
           <ChatAssistant onSaveNote={handleSaveNote} wordHistory={activeWords} language={language} />
         )}
         {currentView === "analytics" && (
-          <AnalyticsView words={activeWords} />
+          <div className="mobile-view-shell"><AnalyticsView words={activeWords} /></div>
         )}
         {currentView === "notebook" && (
           <SmartNotebook notes={notes} onDeleteNote={handleDeleteNote} />
@@ -979,7 +980,7 @@ const App: React.FC = () => {
           <ThesaurusView history={activeWords} onSearch={handleSearchWord} />
         )}
         {currentView === "quiz" && (
-          <QuizView
+          <div className="mobile-view-shell"><QuizView
             history={activeWords}
             onUpdateStatus={async (id, status, srsUpdates) => {
               if (!ensureWritableSession()) return;
@@ -993,7 +994,7 @@ const App: React.FC = () => {
             preselectedWords={quizTargetWords}
             onLookupWord={handleSearchWord}
             language={language}
-          />
+          /></div>
         )}
         {currentView === "trash" && (
           <TrashView
@@ -1006,6 +1007,12 @@ const App: React.FC = () => {
         )}
           </section>
       </main>
+
+      <BottomNav
+        currentView={currentView}
+        onChangeView={setCurrentView}
+        language={language}
+      />
 
       <UsageGuide isOpen={showUsage} onClose={() => setShowUsage(false)} />
 

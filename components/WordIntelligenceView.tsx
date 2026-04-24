@@ -84,7 +84,7 @@ export const WordIntelligenceView: React.FC<WordIntelligenceViewProps> = ({
   };
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-3 md:space-y-4 max-w-full overflow-x-hidden">
       <button
         type="button"
         onClick={onBack}
@@ -93,8 +93,8 @@ export const WordIntelligenceView: React.FC<WordIntelligenceViewProps> = ({
         ← 一覧に戻る
       </button>
 
-      <article className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-        <header className="p-5 md:p-7 bg-gradient-to-br from-indigo-50 to-white border-b border-slate-100">
+      <article className="bg-white border border-slate-200 rounded-2xl md:rounded-3xl shadow-sm overflow-hidden">
+        <header className="p-4 md:p-7 bg-gradient-to-br from-indigo-50 to-white border-b border-slate-100">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-wider font-bold text-indigo-600">Word Intelligence</p>
@@ -111,7 +111,7 @@ export const WordIntelligenceView: React.FC<WordIntelligenceViewProps> = ({
             </button>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={onMarkMastered}
@@ -136,7 +136,7 @@ export const WordIntelligenceView: React.FC<WordIntelligenceViewProps> = ({
           </div>
         </header>
 
-        <div className="p-5 md:p-7 space-y-6">
+        <div className="p-4 md:p-7 space-y-5 md:space-y-6">
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Definition</h3>
             <p className="text-xl font-bold text-slate-900">{word.meaning}</p>
