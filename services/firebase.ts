@@ -14,6 +14,7 @@ import {
   memoryLocalCache,
   persistentLocalCache,
   persistentMultipleTabManager,
+  addDoc,
   collection,
   getDocs,
   getDocsFromCache,
@@ -23,6 +24,7 @@ import {
   updateDoc,
   writeBatch,
   query,
+  serverTimestamp,
   where,
   orderBy,
   limit,
@@ -57,6 +59,14 @@ const db = initializeFirestore(app, {
 export const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
+export type ClientAuthErrorLog = {
+  errorCode: string;
+  errorMessage: string;
+  origin: string;
+  userAgent: string;
+  context: "popup-login" | "redirect-login" | "redirect-result";
+};
+
 export const loginWithGooglePopup = () => signInWithPopup(auth, provider);
 export const loginWithGoogleRedirect = () => signInWithRedirect(auth, provider);
 export const consumeRedirectResult = () => getRedirectResult(auth);
@@ -81,6 +91,14 @@ const requireUserId = async () => {
 };
 
 export const dbService = {
+  async logClientAuthError(payload: ClientAuthErrorLog) {
+    await addDoc(collection(db, "client_error_logs"), {
+      ...payload,
+      path: typeof window !== "undefined" ? window.location.pathname : "",
+      userId: auth.currentUser?.uid || null,
+      createdAt: serverTimestamp(),
+    });
+  },
   async getUserId() {
     const user = await waitForAuthReady();
     return user?.uid || "guest";

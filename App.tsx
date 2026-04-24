@@ -26,6 +26,7 @@ import { fetchWordDetails, SearchFocus } from "./services/geminiService";
 import {
   dbService,
   auth,
+  ClientAuthErrorLog,
   loginWithGooglePopup,
   loginWithGoogleRedirect,
   consumeRedirectResult,
@@ -103,6 +104,23 @@ const App: React.FC = () => {
     }
     return error?.message || "操作に失敗しました";
   }, [language]);
+
+  const logAuthError = useCallback(
+    async (context: ClientAuthErrorLog["context"], error: any) => {
+      try {
+        await dbService.logClientAuthError({
+          context,
+          errorCode: error?.code || "unknown",
+          errorMessage: error?.message || String(error),
+          origin: typeof window !== "undefined" ? window.location.origin : "unknown",
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+        });
+      } catch (logError) {
+        console.warn("Failed to send auth error log:", logError);
+      }
+    },
+    [],
+  );
 
   const ensureWritableSession = useCallback(() => {
     if (isHydratingFreshData) {
@@ -227,12 +245,13 @@ const App: React.FC = () => {
         setShowLogin(false);
         showToast("リダイレクトでログインしました", "success");
       } catch (error: any) {
+        void logAuthError("redirect-result", error);
         showToast(`リダイレクトログインに失敗しました: ${getFirebaseErrorMessage(error)}`, "error");
       }
     };
 
     readRedirectResult();
-  }, [getFirebaseErrorMessage, showToast]);
+  }, [getFirebaseErrorMessage, logAuthError, showToast]);
 
   useEffect(() => {
     if (isGlobalLoading) return;
@@ -263,6 +282,7 @@ const App: React.FC = () => {
       setShowLogin(false);
       showToast("ポップアップでログインしました", "success");
     } catch (error: any) {
+      void logAuthError("popup-login", error);
       showToast(`ポップアップログインに失敗しました: ${getFirebaseErrorMessage(error)}`, "error");
     }
   };
@@ -271,6 +291,7 @@ const App: React.FC = () => {
     try {
       await loginWithGoogleRedirect();
     } catch (error: any) {
+      void logAuthError("redirect-login", error);
       showToast(`リダイレクトログインに失敗しました: ${getFirebaseErrorMessage(error)}`, "error");
     }
   };
