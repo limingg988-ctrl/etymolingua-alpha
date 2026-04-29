@@ -61,6 +61,8 @@ const shuffleFisherYates = <T,>(arr: T[]): T[] => {
 };
 
 export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onExit, preselectedWords, onLookupWord, language }) => {
+  const DISTRACTOR_COUNT = 3;
+  const RECENT_DISTRACTOR_WINDOW = 9; // ≒ 直近3問 × 3択
   const [step, setStep] = useState<'setup' | 'loading' | 'quiz' | 'result'>('setup');
   const [mode, setMode] = useState<QuizMode>('flashcard');
   const [selectedModes, setSelectedModes] = useState<WordStatus[]>(['unknown', 'learning']);
@@ -84,6 +86,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
   const [timeLeft, setTimeLeft] = useState(15);
   const [autoUpdateResult, setAutoUpdateResult] = useState<{from: WordStatus, to: WordStatus} | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recentDistractorsRef = useRef<string[]>([]);
 
   // Initialize with preselected words if available
   useEffect(() => {
@@ -104,17 +107,37 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
       setTimeLeft(15);
 
       if (mode === 'choice') {
-        const otherWords = history.length > 3 ? history.filter(w => w.id !== currentWord.id) : quizQueue.filter(w => w.id !== currentWord.id);
-        const uniqueOtherWords = Array.from(new Map(otherWords.map(w => [w.meaning, w])).values());
+        const mergedPool = [...history, ...quizQueue].filter((w) =>
+          w.id !== currentWord.id && w.meaning !== currentWord.meaning
+        );
+        const uniqueOtherWords = Array.from(
+          new Map(mergedPool.map((w) => [`${w.id}::${w.meaning}`, w])).values()
+        );
 
-        let distractors = shuffleFisherYates(uniqueOtherWords)
-          .slice(0, 3)
-          .map(w => w.meaning);
+        const shuffledCandidates = shuffleFisherYates(uniqueOtherWords);
+        const recentDistractors = new Set(recentDistractorsRef.current);
+        let distractors = shuffledCandidates
+          .filter((w) => !recentDistractors.has(w.meaning))
+          .slice(0, DISTRACTOR_COUNT)
+          .map((w) => w.meaning);
+
+        if (distractors.length < DISTRACTOR_COUNT) {
+          const supplement = shuffledCandidates
+            .filter((w) => !distractors.includes(w.meaning))
+            .slice(0, DISTRACTOR_COUNT - distractors.length)
+            .map((w) => w.meaning);
+          distractors = [...distractors, ...supplement];
+        }
 
         // Fallback for not enough words (especially in AI mode with empty history)
-        while (distractors.length < 3) {
+        while (distractors.length < DISTRACTOR_COUNT) {
             distractors.push("（ダミー選択肢）");
         }
+
+        recentDistractorsRef.current = [
+          ...recentDistractorsRef.current,
+          ...distractors.filter((d) => d !== "（ダミー選択肢）"),
+        ].slice(-RECENT_DISTRACTOR_WINDOW);
 
         const allOptions = shuffleFisherYates([...distractors, currentWord.meaning]);
         setOptions(allOptions);
