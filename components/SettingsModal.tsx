@@ -11,10 +11,11 @@ interface SettingsModalProps {
   onRebuildBooks?: () => void;
   onForceImport?: (data: any) => void;
   wordCount: number;
+  onReportIssue?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ 
-  isOpen, onClose, onExportJSON, onImportJSON, onLoadBook, onDeepRescue, onRebuildBooks, onForceImport, wordCount 
+  isOpen, onClose, onExportJSON, onImportJSON, onLoadBook, onDeepRescue, onRebuildBooks, onForceImport, wordCount, onReportIssue
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'library' | 'diagnosis'>('general');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -184,6 +185,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 gap-2">
+                  {onReportIssue && (
+                    <button
+                      onClick={onReportIssue}
+                      className="w-full py-3 bg-sky-50 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold hover:bg-sky-100 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <i className="fa-solid fa-bug"></i>
+                      問題を報告
+                    </button>
+                  )}
                    {onRebuildBooks && (
                     <button
                       onClick={() => {

@@ -91,6 +91,18 @@ const requireUserId = async () => {
 };
 
 export const dbService = {
+  async submitFeedback(payload: any) {
+    const userId = auth.currentUser?.uid || "guest";
+    const receiptId = `FB-${Date.now().toString(36).toUpperCase()}`;
+    await addDoc(collection(db, "feedback_reports"), {
+      ...payload,
+      userId,
+      receiptId,
+      createdAt: serverTimestamp(),
+      status: "new",
+    });
+    return receiptId;
+  },
   async logClientAuthError(payload: ClientAuthErrorLog) {
     await addDoc(collection(db, "client_error_logs"), {
       ...payload,

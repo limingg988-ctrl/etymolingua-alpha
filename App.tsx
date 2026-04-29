@@ -16,6 +16,7 @@ import { SkeletonLoader } from "./components/SkeletonLoader";
 import { LoginConfirmModal } from "./components/LoginConfirmModal";
 import { WordIntelligenceView } from "./components/WordIntelligenceView";
 import { AnalyticsView } from "./components/AnalyticsView";
+import { FeedbackModal, FeedbackCategory, FeedbackContext } from "./components/FeedbackModal";
 import {
   WordEntry,
   NoteEntry,
@@ -88,10 +89,36 @@ const App: React.FC = () => {
   const [selectedRootChip, setSelectedRootChip] = useState<string>("all");
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
   const [visibleSearchResultsCount, setVisibleSearchResultsCount] = useState(INITIAL_SEARCH_RESULTS_VISIBLE);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackContext, setFeedbackContext] = useState<FeedbackContext | undefined>(undefined);
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
   }, []);
+
+  const openFeedback = useCallback((context?: FeedbackContext) => {
+    setFeedbackContext(context);
+    setShowFeedback(true);
+  }, []);
+
+  const submitFeedback = useCallback(async (payload: { category: FeedbackCategory; message: string; consent: boolean }) => {
+    const now = Date.now();
+    const throttleKey = "feedback-last-submit-at";
+    const last = Number(localStorage.getItem(throttleKey) || "0");
+    if (now - last < 60 * 1000) {
+      throw new Error("短時間での連投はできません。1分後に再試行してください。");
+    }
+    localStorage.setItem(throttleKey, String(now));
+    return dbService.submitFeedback({
+      ...payload,
+      issueId: `ISSUE-${now.toString(36).toUpperCase()}`,
+      context: feedbackContext || {},
+      appVersion: (import.meta as any).env?.VITE_APP_VERSION || "web-dev",
+      osBrowser: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+      occurredAtUtc: new Date().toISOString(),
+      priority: payload.category === "crash" ? "P1" : payload.category === "translation" ? "P2" : "P3",
+    });
+  }, [feedbackContext]);
 
   const getFirebaseErrorMessage = useCallback((error: any) => {
     if (error?.code === "permission-denied") {
@@ -994,6 +1021,7 @@ const App: React.FC = () => {
             preselectedWords={quizTargetWords}
             onLookupWord={handleSearchWord}
             language={language}
+            onReportIssue={openFeedback}
           /></div>
         )}
         {currentView === "trash" && (
@@ -1022,6 +1050,13 @@ const App: React.FC = () => {
         onExportJSON={() => exportToJSON(words.filter((w) => !w.isTrashed))}
         onImportJSON={handleImportJSON}
         wordCount={activeWords.length}
+        onReportIssue={() => openFeedback()}
+      />
+      <FeedbackModal
+        isOpen={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        context={feedbackContext}
+        onSubmit={submitFeedback}
       />
 
       <BookListModal

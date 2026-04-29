@@ -11,6 +11,7 @@ interface QuizViewProps {
   preselectedWords?: WordEntry[]; // New prop for specific quiz targets
   onLookupWord?: (word: string) => void;
   language: AppLanguage;
+  onReportIssue?: (context: { wordId?: string; questionId?: string; mode?: string }) => void;
 }
 
 type QuizMode = 'flashcard' | 'choice' | 'typing' | 'ai_challenge' | 'srs_review';
@@ -60,7 +61,7 @@ const shuffleFisherYates = <T,>(arr: T[]): T[] => {
   return a;
 };
 
-export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onExit, preselectedWords, onLookupWord, language }) => {
+export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onExit, preselectedWords, onLookupWord, language, onReportIssue }) => {
   const DISTRACTOR_COUNT = 3;
   const RECENT_DISTRACTOR_WINDOW = 9; // ≒ 直近3問 × 3択
   const [step, setStep] = useState<'setup' | 'loading' | 'quiz' | 'result'>('setup');
@@ -676,6 +677,14 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
               ></div>
             </div>
           </div>
+          {onReportIssue && (
+            <button
+              onClick={() => onReportIssue({ wordId: currentWord?.id, questionId: currentWord?.id, mode })}
+              className="text-xs px-2 py-1 rounded-lg border border-slate-200 text-slate-500 hover:bg-white"
+            >
+              この問題を報告
+            </button>
+          )}
 
           {mode !== 'flashcard' && !isFlipped && (
             <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center text-xs font-bold ${timeLeft <= 5 ? 'border-red-400 text-red-500 animate-pulse' : 'border-slate-200 text-slate-400'}`}>
