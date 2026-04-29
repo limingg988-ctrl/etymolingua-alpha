@@ -50,6 +50,16 @@ const playSound = (type: 'correct' | 'incorrect') => {
   }
 };
 
+
+const shuffleFisherYates = <T,>(arr: T[]): T[] => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onExit, preselectedWords, onLookupWord, language }) => {
   const [step, setStep] = useState<'setup' | 'loading' | 'quiz' | 'result'>('setup');
   const [mode, setMode] = useState<QuizMode>('flashcard');
@@ -95,18 +105,18 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
 
       if (mode === 'choice') {
         const otherWords = history.length > 3 ? history.filter(w => w.id !== currentWord.id) : quizQueue.filter(w => w.id !== currentWord.id);
-        
-        let distractors = [...otherWords]
-          .sort(() => Math.random() - 0.5)
+        const uniqueOtherWords = Array.from(new Map(otherWords.map(w => [w.meaning, w])).values());
+
+        let distractors = shuffleFisherYates(uniqueOtherWords)
           .slice(0, 3)
           .map(w => w.meaning);
-        
+
         // Fallback for not enough words (especially in AI mode with empty history)
         while (distractors.length < 3) {
             distractors.push("（ダミー選択肢）");
         }
 
-        const allOptions = [...distractors, currentWord.meaning].sort(() => Math.random() - 0.5);
+        const allOptions = shuffleFisherYates([...distractors, currentWord.meaning]);
         setOptions(allOptions);
       } else if (mode === 'typing') {
         setTypingInput('');
@@ -185,7 +195,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
     } else {
         filtered = history.filter(w => selectedModes.includes(w.status));
         // Shuffle for normal modes
-        filtered.sort(() => Math.random() - 0.5);
+        filtered = shuffleFisherYates(filtered);
     }
 
     // Apply Word Type Filter
