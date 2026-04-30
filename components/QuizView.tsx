@@ -682,7 +682,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ history, onUpdateStatus, onE
               onClick={() => onReportIssue({ wordId: currentWord?.id, questionId: currentWord?.id, mode })}
               className="text-xs px-2 py-1 rounded-lg border border-slate-200 text-slate-500 hover:bg-white"
             >
-              この問題を報告
+              問題を報告
             </button>
           )}
 

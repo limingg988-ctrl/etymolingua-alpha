@@ -24,6 +24,7 @@ interface HeaderProps {
   onRepairBooks?: () => void;
   language: AppLanguage;
   onLanguageChange: (lang: AppLanguage) => void;
+  onReportIssue?: () => void;
 }
 
 const NAV_ITEMS: { key: ViewMode; labelKey: string; icon: string }[] = [
@@ -73,6 +74,7 @@ const DesktopTopBar: React.FC<HeaderProps> = ({
   onRepairBooks,
   onOpenUsage,
   onOpenSettings,
+  onReportIssue,
   language,
   onLanguageChange,
 }) => (
@@ -174,6 +176,14 @@ const DesktopTopBar: React.FC<HeaderProps> = ({
         <i className="fa-regular fa-circle-question"></i>
       </button>
       <button
+        onClick={onReportIssue}
+        className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 border border-slate-200 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+        title="問題を報告"
+      >
+        <i className="fa-regular fa-flag"></i>
+        <span>問題を報告</span>
+      </button>
+      <button
         onClick={onOpenSettings}
         className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors rounded-full hover:bg-slate-100"
         title="設定"
@@ -194,6 +204,7 @@ const MobileTopBar: React.FC<HeaderProps> = ({
   onRepairBooks,
   onOpenUsage,
   onOpenSettings,
+  onReportIssue,
   language,
   onLanguageChange,
 }) => {
@@ -293,6 +304,9 @@ const MobileTopBar: React.FC<HeaderProps> = ({
               </button>
               <button onClick={onOpenSettings} className="w-full text-left px-3 py-3 rounded-xl border border-slate-200">
                 <i className="fa-solid fa-gear mr-2 text-slate-500"></i>設定
+              </button>
+              <button onClick={onReportIssue} className="w-full text-left px-3 py-3 rounded-xl border border-slate-200">
+                <i className="fa-regular fa-flag mr-2 text-slate-500"></i>問題を報告
               </button>
             </div>
             <label className="flex items-center justify-between mt-4 text-sm font-semibold text-slate-600">
