@@ -802,6 +802,7 @@ const App: React.FC = () => {
         onLogout={() => logout()}
         language={language}
         onLanguageChange={setLanguage}
+        onReportIssue={() => openFeedback({ mode: currentView })}
       />
       <main className="app-main-shell md:pl-56 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8">
           <section className="app-main-container">
@@ -1021,7 +1022,7 @@ const App: React.FC = () => {
             preselectedWords={quizTargetWords}
             onLookupWord={handleSearchWord}
             language={language}
-            onReportIssue={openFeedback}
+            onReportIssue={(context) => openFeedback({ mode: currentView, ...context })}
           /></div>
         )}
         {currentView === "trash" && (
@@ -1050,7 +1051,7 @@ const App: React.FC = () => {
         onExportJSON={() => exportToJSON(words.filter((w) => !w.isTrashed))}
         onImportJSON={handleImportJSON}
         wordCount={activeWords.length}
-        onReportIssue={() => openFeedback()}
+        onReportIssue={() => openFeedback({ mode: currentView })}
       />
       <FeedbackModal
         isOpen={showFeedback}
