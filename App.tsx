@@ -393,13 +393,20 @@ const App: React.FC = () => {
     setVisibleSearchResultsCount(INITIAL_SEARCH_RESULTS_VISIBLE);
 
     const results: GeminiResponse[] = [];
-    for (const query of queries) {
-      try {
-        const result = await fetchWordDetails(query, { focus: searchFocus });
-        results.push(result);
-      } catch (err: any) {
-        showToast(`「${query}」: ${err.message || t(language, "app.searchFailed")}`, "error");
-      }
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < queries.length; i += CHUNK_SIZE) {
+      const chunk = queries.slice(i, i + CHUNK_SIZE);
+      const chunkResults = await Promise.all(
+        chunk.map(async (query) => {
+          try {
+            return await fetchWordDetails(query, { focus: searchFocus });
+          } catch (err: any) {
+            showToast(`「${query}」: ${err.message || t(language, "app.searchFailed")}`, "error");
+            return null;
+          }
+        }),
+      );
+      results.push(...chunkResults.filter((result): result is GeminiResponse => result !== null));
     }
     setSearchResults(results);
     setIsSearching(false);
