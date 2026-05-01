@@ -30,6 +30,15 @@ service cloud.firestore {
       allow read, update, delete: if isOwner();
     }
 
+    match /troubleReports/{docId} {
+      allow create: if request.resource.data.userId is string
+        && (
+          request.resource.data.userId == "anonymous"
+          || (isSignedIn() && request.resource.data.userId == request.auth.uid)
+        );
+      allow read, update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
