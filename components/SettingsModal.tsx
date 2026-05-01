@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { WORD_BOOKS, WordBook } from '../data/wordBooks';
+import { TroubleReportForm } from './TroubleReportForm';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -11,11 +12,13 @@ interface SettingsModalProps {
   onRebuildBooks?: () => void;
   onForceImport?: (data: any) => void;
   wordCount: number;
+  user: any;
+  showToast: (message: string, type?: any) => void;
   onReportIssue?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ 
-  isOpen, onClose, onExportJSON, onImportJSON, onLoadBook, onDeepRescue, onRebuildBooks, onForceImport, wordCount, onReportIssue
+  isOpen, onClose, onExportJSON, onImportJSON, onLoadBook, onDeepRescue, onRebuildBooks, onForceImport, wordCount, user, showToast, onReportIssue
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'library' | 'diagnosis'>('general');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -220,6 +223,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <p className="text-[10px] text-slate-400 mt-1 text-center">
                     ※ブラウザのキャッシュが消えた場合や、データが表示されない場合に使用してください。
                   </p>
+
+                  <TroubleReportForm user={user} showToast={showToast} />
                 </div>
               </div>
             </div>
