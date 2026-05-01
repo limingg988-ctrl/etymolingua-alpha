@@ -30,25 +30,14 @@ service cloud.firestore {
       allow read, update, delete: if isOwner();
     }
 
-    function isValidTroubleReport() {
-      return request.resource.data.content is string
-        && request.resource.data.content.size() > 0
-        && request.resource.data.context is string
-        && request.resource.data.context.size() > 0
-        && request.resource.data.timestamp is number
-        && request.resource.data.email is string
-        && request.resource.data.userId is string;
-    }
-
-    function isTroubleReportSenderAllowed() {
-      return request.resource.data.userId == "anonymous"
-        || (isSignedIn() && request.resource.data.userId == request.auth.uid);
-    }
-
     // Canonical feedback/report collection.
     // Deprecated: do not add /feedback_reports rules; client writes to /troubleReports only.
     match /troubleReports/{docId} {
-      allow create: if isValidTroubleReport() && isTroubleReportSenderAllowed();
+      allow create: if
+        (
+          (isSignedIn() && request.resource.data.userId == request.auth.uid)
+          || (!isSignedIn() && request.resource.data.userId == "anonymous")
+        );
       allow read, update, delete: if false;
     }
 
