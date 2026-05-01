@@ -1145,6 +1145,8 @@ const App: React.FC = () => {
         onExportJSON={() => exportToJSON(words.filter((w) => !w.isTrashed))}
         onImportJSON={handleImportJSON}
         wordCount={activeWords.length}
+        user={user}
+        showToast={showToast}
         onReportIssue={() => openFeedback({ mode: currentView })}
       />
       <FeedbackModal
