@@ -82,6 +82,8 @@ const waitForAuthReady = async (): Promise<User | null> => {
   });
 };
 
+const TROUBLE_REPORTS_COLLECTION = "troubleReports";
+
 const requireUserId = async () => {
   const user = await waitForAuthReady();
   if (!user?.uid) {
@@ -98,7 +100,7 @@ export const dbService = {
       ? payload.context
       : JSON.stringify(payload?.context || {});
 
-    await addDoc(collection(db, "troubleReports"), {
+    await addDoc(collection(db, TROUBLE_REPORTS_COLLECTION), {
       ...payload,
       content: payload?.content || payload?.message || "",
       context: payload?.contextText || contextValue,
@@ -112,7 +114,7 @@ export const dbService = {
     return receiptId;
   },
   async addTroubleReport(data: any) {
-    await addDoc(collection(db, "troubleReports"), {
+    await addDoc(collection(db, TROUBLE_REPORTS_COLLECTION), {
       content: data.content,
       context: data.context,
       email: data.email,
