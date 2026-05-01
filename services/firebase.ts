@@ -92,11 +92,19 @@ const requireUserId = async () => {
 
 export const dbService = {
   async submitFeedback(payload: any) {
-    const userId = payload?.userId || auth.currentUser?.uid || "guest";
+    const userId = payload?.userId || auth.currentUser?.uid || "anonymous";
     const receiptId = `FB-${Date.now().toString(36).toUpperCase()}`;
-    await addDoc(collection(db, "feedback_reports"), {
+    const contextValue = typeof payload?.context === "string"
+      ? payload.context
+      : JSON.stringify(payload?.context || {});
+
+    await addDoc(collection(db, "troubleReports"), {
       ...payload,
+      content: payload?.content || payload?.message || "",
+      context: payload?.contextText || contextValue,
+      email: typeof payload?.email === "string" ? payload.email : "",
       userId,
+      timestamp: typeof payload?.timestamp === "number" ? payload.timestamp : Date.now(),
       receiptId,
       createdAt: serverTimestamp(),
       status: "new",
