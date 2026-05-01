@@ -92,7 +92,7 @@ const requireUserId = async () => {
 
 export const dbService = {
   async submitFeedback(payload: any) {
-    const userId = auth.currentUser?.uid || "guest";
+    const userId = payload?.userId || auth.currentUser?.uid || "guest";
     const receiptId = `FB-${Date.now().toString(36).toUpperCase()}`;
     await addDoc(collection(db, "feedback_reports"), {
       ...payload,
