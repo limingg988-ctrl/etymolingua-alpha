@@ -103,6 +103,15 @@ export const dbService = {
     });
     return receiptId;
   },
+  async addTroubleReport(data: any) {
+    await addDoc(collection(db, "troubleReports"), {
+      content: data.content,
+      context: data.context,
+      email: data.email,
+      userId: data.userId,
+      timestamp: data.timestamp,
+    });
+  },
   async logClientAuthError(payload: ClientAuthErrorLog) {
     await addDoc(collection(db, "client_error_logs"), {
       ...payload,
