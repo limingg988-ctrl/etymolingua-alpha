@@ -10,6 +10,7 @@ interface WordIntelligenceViewProps {
   onMarkMastered: () => void;
   onPractice: () => void;
   onStartQuiz: () => void;
+  onDelete?: () => void;
 }
 
 type SemanticNode = {
@@ -31,6 +32,7 @@ export const WordIntelligenceView: React.FC<WordIntelligenceViewProps> = ({
   onMarkMastered,
   onPractice,
   onStartQuiz,
+  onDelete,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReducedMotion, setIsReducedMotion] = useState(false);
@@ -133,6 +135,15 @@ export const WordIntelligenceView: React.FC<WordIntelligenceViewProps> = ({
             >
               Quiz
             </button>
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="px-4 py-2 text-sm rounded-xl bg-red-500 text-white hover:bg-red-600"
+              >
+                削除
+              </button>
+            )}
           </div>
         </header>
 

@@ -17,6 +17,28 @@
   --radius-panel: 1.5rem;
 }
 
+/* カスタムカラークラス定義 */
+.bg-primary-600 { background-color: var(--color-primary-600) !important; }
+.bg-primary-500 { background-color: var(--color-primary-500) !important; }
+.bg-primary-50 { background-color: var(--color-primary-50) !important; }
+.bg-secondary-500 { background-color: var(--color-secondary-500) !important; }
+.bg-white { background-color: white !important; }
+.bg-slate-50 { background-color: #f8fafc !important; }
+.bg-slate-100 { background-color: #f1f5f9 !important; }
+
+.text-primary-600 { color: var(--color-primary-600) !important; }
+.text-white { color: white !important; }
+.text-surface-700 { color: var(--color-surface-700) !important; }
+.text-surface-500 { color: var(--color-surface-500) !important; }
+.text-surface-900 { color: var(--color-surface-900) !important; }
+.text-slate-600 { color: #475569 !important; }
+.text-slate-400 { color: #cbd5e1 !important; }
+.text-slate-700 { color: #334155 !important; }
+
+.border-surface-200 { border-color: var(--color-surface-200) !important; }
+.border-primary-600 { border-color: var(--color-primary-600) !important; }
+.border-slate-200 { border-color: #e2e8f0 !important; }
+
 body {
   margin: 0;
   font-family: var(--font-sans);

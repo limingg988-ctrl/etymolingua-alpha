@@ -326,6 +326,17 @@ const App: React.FC = () => {
 
   const handleAddWord = async (geminiData: GeminiResponse) => {
     if (!ensureWritableSession()) return;
+    if (
+      words.some(
+        (word) =>
+          word.word.trim().toLowerCase() === geminiData.word.trim().toLowerCase() &&
+          !word.isTrashed,
+      )
+    ) {
+      showToast(`「${geminiData.word}」は既に保存されています`, "info");
+      return;
+    }
+
     const newWord: WordEntry = {
       ...geminiData,
       id: crypto.randomUUID(),
@@ -340,8 +351,6 @@ const App: React.FC = () => {
       await dbService.addWord(newWord);
       await loadAllWordsCount();
       showToast(`「${newWord.word}」を保存しました`, "success");
-      setSearchResults([]);
-      setSearchQuery("");
     } catch (error: any) {
       setWords((prev) => prev.filter((w) => w.id !== newWord.id));
       showToast(getFirebaseErrorMessage(error), "error");
@@ -623,6 +632,41 @@ const App: React.FC = () => {
     [searchResults, visibleSearchResultsCount],
   );
 
+  const isSearchResultAlreadySaved = useCallback(
+    (result: GeminiResponse) =>
+      words.some(
+        (word) =>
+          word.word.trim().toLowerCase() === result.word.trim().toLowerCase() &&
+          !word.isTrashed,
+      ),
+    [words],
+  );
+
+  const handleClearSearchResults = useCallback(() => {
+    setSearchResults([]);
+    setVisibleSearchResultsCount(INITIAL_SEARCH_RESULTS_VISIBLE);
+  }, [INITIAL_SEARCH_RESULTS_VISIBLE]);
+
+  const handleSaveAllSearchResults = useCallback(async () => {
+    if (!ensureWritableSession()) return;
+    const unsavedResults = searchResults.filter(
+      (result) => !isSearchResultAlreadySaved(result),
+    );
+    if (unsavedResults.length === 0) {
+      showToast("すべての単語は既に保存されています", "info");
+      return;
+    }
+
+    for (const result of unsavedResults) {
+      await handleAddWord(result);
+    }
+  }, [ensureWritableSession, handleAddWord, isSearchResultAlreadySaved, searchResults, showToast]);
+
+  const unsavedSearchResultsCount = useMemo(
+    () => searchResults.filter((result) => !isSearchResultAlreadySaved(result)).length,
+    [searchResults, isSearchResultAlreadySaved],
+  );
+
   const selectedListWord = useMemo(
     () => activeWords.find((word) => word.id === selectedWordId) || null,
     [activeWords, selectedWordId],
@@ -854,27 +898,65 @@ const App: React.FC = () => {
             <p className="text-xs text-surface-500">
               複数検索は「, / 改行 / ;」区切りで入力できます（例: take off, resilience, look up）。「/」を含む語は1語として扱います。
             </p>
-            {isSearching && <SkeletonLoader />}
-            {visibleSearchResults.map((result, idx) => (
-              <div key={`${result.word}-${idx}`} className="space-y-2 ui-glass ui-rounded-panel p-3">
-                <WordCard
-                  word={
-                    {
-                      ...result,
-                      id: `temp-${idx}`,
-                      status: "unknown",
-                      timestamp: Date.now(),
-                    } as any
-                  }
-                />
-                <button
-                  onClick={() => handleAddWord(result)}
-                  className="w-full bg-primary-600 text-white py-3 rounded-2xl font-bold ui-elevation"
-                >
-                  {t(language, "app.addWord", { word: result.word })}
-                </button>
+            {searchResults.length > 0 && (
+              <div className="ui-glass ui-rounded-panel p-4 border border-surface-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    検索結果 {searchResults.length} 件
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    保存後もこの画面は残ります。必要な語を続けて保存できます。
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveAllSearchResults}
+                    className="px-4 py-2 bg-secondary-500 text-white rounded-2xl font-bold hover:bg-secondary-600 transition-colors"
+                  >
+                    すべて保存
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearSearchResults}
+                    className="px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-colors"
+                  >
+                    閉じる
+                  </button>
+                </div>
               </div>
-            ))}
+            )}
+            {isSearching && <SkeletonLoader />}
+            {visibleSearchResults.map((result, idx) => {
+              const alreadySaved = isSearchResultAlreadySaved(result);
+              return (
+                <div key={`${result.word}-${idx}`} className="space-y-2 ui-glass ui-rounded-panel p-3">
+                  <WordCard
+                    word={
+                      {
+                        ...result,
+                        id: `temp-${idx}`,
+                        status: "unknown",
+                        timestamp: Date.now(),
+                      } as any
+                    }
+                  />
+                  <button
+                    onClick={() => handleAddWord(result)}
+                    disabled={alreadySaved}
+                    className={`w-full py-3 rounded-2xl font-bold ui-elevation transition-colors ${
+                      alreadySaved
+                        ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                        : "bg-primary-600 text-white hover:bg-primary-700"
+                    }`}
+                  >
+                    {alreadySaved
+                      ? "保存済み"
+                      : t(language, "app.addWord", { word: result.word })}
+                  </button>
+                </div>
+              );
+            })}
             {searchResults.length > visibleSearchResults.length && (
               <button
                 type="button"
@@ -890,14 +972,18 @@ const App: React.FC = () => {
             )}
             {searchResults.length > 1 && (
               <button
-                onClick={async () => {
-                  for (const result of searchResults) {
-                    await handleAddWord(result);
-                  }
-                }}
-                className="w-full bg-secondary-500 text-white py-4 rounded-2xl font-bold ui-elevation"
+                type="button"
+                onClick={handleSaveAllSearchResults}
+                disabled={unsavedSearchResultsCount === 0}
+                className={`w-full py-4 rounded-2xl font-bold ui-elevation transition-colors ${
+                  unsavedSearchResultsCount === 0
+                    ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                    : "bg-secondary-500 text-white hover:bg-secondary-600"
+                }`}
               >
-                {t(language, "app.addAll", { count: searchResults.length })}
+                {unsavedSearchResultsCount === 0
+                  ? "すべて保存済み"
+                  : `残り ${unsavedSearchResultsCount} 件を保存`}
               </button>
             )}
             {searchResults.length === 0 && !isSearching && (
@@ -921,6 +1007,7 @@ const App: React.FC = () => {
                   setQuizTargetWords([selectedListWord]);
                   setCurrentView("quiz");
                 }}
+                onDelete={() => handleMoveWordToTrash(selectedListWord.id)}
               />
             ) : (
               <>
