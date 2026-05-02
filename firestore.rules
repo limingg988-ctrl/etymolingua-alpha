@@ -30,8 +30,6 @@ service cloud.firestore {
       allow read, update, delete: if isOwner();
     }
 
-    // Canonical feedback/report collection.
-    // Deprecated: do not add /feedback_reports rules; client writes to /troubleReports only.
     match /troubleReports/{docId} {
       allow create: if
         (
