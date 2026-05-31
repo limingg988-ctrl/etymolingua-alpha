@@ -18,7 +18,7 @@ const EXPLAIN_MODE_SUFFIXES: Record<ExplainMode, string> = {
 const getAI = () => {
   // Use process.env.API_KEY exclusively as per guidelines
   // Do not use localStorage or UI input for API key.
-  const apiKey = process.env.API_KEY;
+  const apiKey = import.meta.env.VITE_API_KEY;
   
   if (!apiKey) {
     throw new Error("API Key is not configured in the environment.");
