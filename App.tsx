@@ -49,11 +49,20 @@ type ViewMode =
   | "trash";
 
 const App: React.FC = () => {
+  const NOTICE_KEY = "notice_api_fix_dismissed";
+  const NOTICE_EXPIRY = new Date(2026, 5, 5).getTime();
   const WORDS_PAGE_SIZE = 30;
   const INITIAL_VISIBLE_COUNT = 20;
   const VISIBLE_COUNT_STEP = 20;
   const INITIAL_SEARCH_RESULTS_VISIBLE = 3;
   const SEARCH_RESULTS_VISIBLE_STEP = 3;
+  const [showNotice, setShowNotice] = useState(() => {
+    try {
+      return !localStorage.getItem(NOTICE_KEY) && Date.now() < NOTICE_EXPIRY;
+    } catch {
+      return Date.now() < NOTICE_EXPIRY;
+    }
+  });
   const [isGlobalLoading, setIsGlobalLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewMode>("search");
   const [user, setUser] = useState<any>(null);
@@ -94,6 +103,15 @@ const App: React.FC = () => {
 
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
+  }, []);
+
+  const dismissNotice = useCallback(() => {
+    try {
+      localStorage.setItem(NOTICE_KEY, "1");
+    } catch {
+      // Ignore storage failures and just hide the banner for this session.
+    }
+    setShowNotice(false);
   }, []);
 
   const openFeedback = useCallback((context?: FeedbackContext) => {
@@ -257,6 +275,20 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem("app-language", language);
   }, [language]);
+
+  useEffect(() => {
+    if (!showNotice) return;
+    const remaining = NOTICE_EXPIRY - Date.now();
+    if (remaining <= 0) {
+      setShowNotice(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setShowNotice(false);
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [showNotice, NOTICE_EXPIRY]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -840,6 +872,38 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface-50 overflow-x-hidden">
+      {showNotice && (
+        <div className="relative z-30 bg-primary-600 px-4 py-4 shadow-lg sm:px-6">
+          <div className="mx-auto flex max-w-5xl items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20">
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 text-white">
+                <path
+                  fill="currentColor"
+                  d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9-1.9 5.6-1.9-5.6-5.6-1.9 5.6-1.9L12 2.5Zm6.5 10.7l1 2.9 2.9 1-2.9 1-1 2.9-1-2.9-2.9-1 2.9-1 1-2.9Z"
+                />
+              </svg>
+            </div>
+            <div className="flex-1 pr-8">
+              <p className="text-[14px] font-bold leading-tight text-white sm:text-[15px]">
+                以前発生していたAI検索機能のエラーを修正しました。ご不便をおかけしました。
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={dismissNotice}
+              className="absolute right-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/25"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 text-white">
+                <path
+                  fill="currentColor"
+                  d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.29l6.3 6.29 6.3-6.29 1.41 1.42Z"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       <Header
         currentView={currentView}
         onChangeView={setCurrentView}
