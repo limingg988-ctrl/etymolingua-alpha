@@ -96,6 +96,15 @@ const BASE_SYSTEM_INSTRUCTION = `あなたは世界一わかりやすい英語�
   必ず純粋なJSONのみを返してください。`;
 
 export type SearchFocus = "all" | "idioms" | "etymology" | "core";
+export type AiSpeedMode = "fast" | "standard";
+
+const AI_MODEL_BY_SPEED: Record<AiSpeedMode, string> = {
+  fast: "gemini-2.5-flash-lite",
+  standard: "gemini-3-flash-preview",
+};
+
+const AI_CACHE_VERSION = "v1";
+const AI_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14;
 
 const SEARCH_FOCUS_SUFFIXES: Record<SearchFocus, string> = {
   all: "",
@@ -107,17 +116,49 @@ const SEARCH_FOCUS_SUFFIXES: Record<SearchFocus, string> = {
     "※ 重点: meaning / nuance / exampleSentence を短く実用的に、初学者向けに簡潔にまとめてください。",
 };
 
+const aiCacheKey = (word: string, explainMode: ExplainMode, focus: SearchFocus, aiSpeedMode: AiSpeedMode) =>
+  `ai-word-cache:${AI_CACHE_VERSION}:${aiSpeedMode}:${explainMode}:${focus}:${word.trim().toLowerCase()}`;
+
+const readCachedWordDetails = (key: string): GeminiResponse | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (!cached?.timestamp || Date.now() - cached.timestamp > AI_CACHE_TTL_MS) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+    return cached.data as GeminiResponse;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedWordDetails = (key: string, data: GeminiResponse) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify({ timestamp: Date.now(), data }));
+  } catch {
+    // Cache is an optimization; storage failures should not break lookup.
+  }
+};
+
 export const fetchWordDetails = async (
   word: string,
-  options?: { explainMode?: ExplainMode; focus?: SearchFocus },
+  options?: { explainMode?: ExplainMode; focus?: SearchFocus; aiSpeedMode?: AiSpeedMode },
 ): Promise<GeminiResponse> => {
   const ai = getAI();
   const explainMode = options?.explainMode ?? "en-ja";
   const focus = options?.focus ?? "all";
+  const aiSpeedMode = options?.aiSpeedMode ?? "fast";
+  const cacheKey = aiCacheKey(word, explainMode, focus, aiSpeedMode);
+  const cached = readCachedWordDetails(cacheKey);
+  if (cached) return cached;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: AI_MODEL_BY_SPEED[aiSpeedMode],
       contents: `次の英単語/熟語を解説してください: ${word}`,
       config: {
         systemInstruction: `${BASE_SYSTEM_INSTRUCTION}
@@ -207,7 +248,9 @@ ${SEARCH_FOCUS_SUFFIXES[focus]}`,
     if (!text) throw new Error("AIからの応答が空でした。");
 
     const cleanText = text.replace(/^```json\s*/, "").replace(/\s*```$/, "").trim();
-    return JSON.parse(cleanText);
+    const parsed = JSON.parse(cleanText);
+    writeCachedWordDetails(cacheKey, parsed);
+    return parsed;
   } catch (error) {
     handleApiError(error);
     throw error;

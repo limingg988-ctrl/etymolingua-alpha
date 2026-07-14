@@ -30,6 +30,7 @@ import {
   limit,
   startAfter,
   getCountFromServer,
+  onSnapshot,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -223,6 +224,53 @@ export const dbService = {
       console.error("Firestore server read error:", error);
       throw error;
     }
+  },
+  subscribeUserData(
+    userId: string,
+    handlers: {
+      onBooks: (books: any[]) => void;
+      onNotes: (notes: any[]) => void;
+      onWords: (words: any[]) => void;
+      onError?: (error: any) => void;
+    },
+  ) {
+    const handleError = (error: any) => {
+      console.error("Firestore realtime sync error:", error);
+      handlers.onError?.(error);
+    };
+    const booksUnsubscribe = onSnapshot(
+      query(collection(db, "books"), where("userId", "==", userId)),
+      (snap) => handlers.onBooks(
+        snap.docs
+          .map((d) => d.data() as any)
+          .sort((a, b) => (b.timestamp || b.createdAt || 0) - (a.timestamp || a.createdAt || 0)),
+      ),
+      handleError,
+    );
+    const notesUnsubscribe = onSnapshot(
+      query(collection(db, "notes"), where("userId", "==", userId)),
+      (snap) => handlers.onNotes(
+        snap.docs
+          .map((d) => d.data() as any)
+          .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)),
+      ),
+      handleError,
+    );
+    const wordsUnsubscribe = onSnapshot(
+      query(collection(db, "words"), where("userId", "==", userId)),
+      (snap) => handlers.onWords(
+        snap.docs
+          .map((d) => d.data() as any)
+          .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)),
+      ),
+      handleError,
+    );
+
+    return () => {
+      booksUnsubscribe();
+      notesUnsubscribe();
+      wordsUnsubscribe();
+    };
   },
   async addWord(word: any) {
     const userId = await requireUserId();

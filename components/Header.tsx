@@ -87,7 +87,7 @@ const DesktopTopBar: React.FC<HeaderProps> = ({
         <div className="bg-indigo-600 p-2 rounded-lg shadow-md shadow-indigo-200">
           <i className="fa-solid fa-book-sparkles text-white text-xl"></i>
         </div>
-        <span className="font-black text-slate-800 text-lg tracking-tight">Etymolingua-alpha</span>
+        <span className="font-black text-slate-800 text-lg tracking-tight">Etymolingua</span>
       </button>
 
       <button

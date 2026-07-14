@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { WORD_BOOKS, WordBook } from '../data/wordBooks';
 import { TroubleReportForm } from './TroubleReportForm';
 
@@ -8,9 +8,7 @@ interface SettingsModalProps {
   onExportJSON: () => void;
   onImportJSON: (file: File) => void;
   onLoadBook?: (bookData: any[]) => void;
-  onDeepRescue?: () => void;
   onRebuildBooks?: () => void;
-  onForceImport?: (data: any) => void;
   wordCount: number;
   user: any;
   showToast: (message: string, type?: any) => void;
@@ -18,43 +16,10 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ 
-  isOpen, onClose, onExportJSON, onImportJSON, onLoadBook, onDeepRescue, onRebuildBooks, onForceImport, wordCount, user, showToast, onReportIssue
+  isOpen, onClose, onExportJSON, onImportJSON, onLoadBook, onRebuildBooks, wordCount, user, showToast, onReportIssue
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'library' | 'diagnosis'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'library'>('general');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [storageItems, setStorageItems] = useState<{key: string, size: number, type: string, raw: string}[]>([]);
-
-  useEffect(() => {
-    if (isOpen) {
-      // Load storage items for diagnosis
-      if (activeTab === 'diagnosis') {
-        const items = [];
-        for(let i = 0; i < localStorage.length; i++) {
-           const key = localStorage.key(i);
-           if(key) {
-               const val = localStorage.getItem(key) || "";
-               let type = "Unknown";
-               try {
-                   const parsed = JSON.parse(val);
-                   if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].word && parsed[0].meaning) {
-                       type = `単語リスト (${parsed.length}語)`;
-                   } else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].id && parsed[0].title) {
-                       type = `Bookリスト / ノート`;
-                   } else if (parsed.type === 'full_backup') {
-                       type = `完全バックアップ`;
-                   } else {
-                       type = "JSON Data";
-                   }
-               } catch(e) {
-                   type = "Raw Text";
-               }
-               items.push({ key, size: val.length, type, raw: val });
-           }
-        }
-        setStorageItems(items);
-      }
-    }
-  }, [isOpen, activeTab]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -78,18 +43,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
   
-  const handleForceImportClick = (raw: string) => {
-      if (!onForceImport) return;
-      if (window.confirm("このデータを強制的に読み込みますか？\n現在のデータと統合されます。")) {
-          try {
-              const data = JSON.parse(raw);
-              onForceImport(data);
-          } catch(e) {
-              alert("データの解析に失敗しました。");
-          }
-      }
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -133,16 +86,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <i className="fa-solid fa-book-open mr-2"></i>ライブラリ
           </button>
-          <button 
-            onClick={() => setActiveTab('diagnosis')}
-            className={`flex-1 py-3 px-2 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${
-              activeTab === 'diagnosis' 
-                ? 'border-amber-500 text-amber-600 bg-amber-50/50' 
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <i className="fa-solid fa-stethoscope mr-2"></i>診断(救出)
-          </button>
         </div>
 
         {/* Content */}
@@ -152,6 +95,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="space-y-8 animate-in slide-in-from-right-4 duration-200">
               {/* Data Management Section */}
               <div>
+                <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-bold text-slate-600">同期アカウント UID</p>
+                  <p className="mt-1 break-all font-mono text-xs text-slate-800">
+                    {user?.uid || '未ログイン'}
+                  </p>
+                </div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">
                   <i className="fa-solid fa-database text-indigo-500 mr-2"></i>データバックアップ・復元
                 </label>
@@ -211,19 +160,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   )}
 
-                  {onDeepRescue && (
-                    <button
-                      onClick={onDeepRescue}
-                      className="w-full py-3 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-                    >
-                       <i className="fa-solid fa-life-ring"></i>
-                       データ救出（Deep Scan）
-                    </button>
-                  )}
-                  <p className="text-[10px] text-slate-400 mt-1 text-center">
-                    ※ブラウザのキャッシュが消えた場合や、データが表示されない場合に使用してください。
-                  </p>
-
                   <TroubleReportForm user={user} showToast={showToast} />
                 </div>
               </div>
@@ -267,58 +203,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                  ))}
                </div>
             </div>
-          )}
-
-          {activeTab === 'diagnosis' && (
-             <div className="animate-in slide-in-from-right-4 duration-200">
-               <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-4">
-                 <h3 className="text-amber-800 font-bold text-sm mb-1">
-                   <i className="fa-solid fa-microscope mr-2"></i>
-                   ストレージ診断ツール
-                 </h3>
-                 <p className="text-xs text-amber-700 leading-relaxed">
-                   ブラウザ内に保存されている全データを表示しています。<br/>
-                   「強制取込」ボタンを押すと、そのデータを現在の画面に無理やりロードします。<br/>
-                   <strong>ここにデータが表示されない場合、ブラウザのキャッシュ削除等により完全に消失しています。</strong>
-                 </p>
-               </div>
-
-               {storageItems.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    保存されているデータが見つかりません
-                  </div>
-               ) : (
-                  <div className="space-y-3">
-                    {storageItems.map((item, idx) => (
-                      <div key={idx} className="bg-slate-50 border border-slate-200 p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                         <div className="min-w-0 overflow-hidden">
-                           <div className="font-mono text-xs font-bold text-slate-700 break-all">
-                             {item.key}
-                           </div>
-                           <div className="text-[10px] text-slate-500 mt-1 flex gap-2">
-                             <span className="bg-slate-200 px-1.5 rounded">{Math.round(item.size / 1024 * 10) / 10} KB</span>
-                             <span className={`px-1.5 rounded ${item.type.includes('単語') ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-slate-200'}`}>
-                               {item.type}
-                             </span>
-                           </div>
-                         </div>
-                         
-                         {item.type.includes('単語') || item.type.includes('backup') ? (
-                           <button 
-                             onClick={() => handleForceImportClick(item.raw)}
-                             className="px-3 py-1.5 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg hover:bg-amber-200 transition-colors whitespace-nowrap flex-shrink-0"
-                           >
-                             <i className="fa-solid fa-file-import mr-1"></i>
-                             強制取込
-                           </button>
-                         ) : (
-                           <span className="text-[10px] text-slate-400 px-2">対象外</span>
-                         )}
-                      </div>
-                    ))}
-                  </div>
-               )}
-             </div>
           )}
 
         </div>

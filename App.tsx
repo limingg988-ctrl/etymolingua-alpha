@@ -24,7 +24,7 @@ import {
   GeminiResponse,
   WordStatus,
 } from "./types";
-import { fetchWordDetails, SearchFocus } from "./services/geminiService";
+import { fetchWordDetails, SearchFocus, AiSpeedMode } from "./services/geminiService";
 import {
   dbService,
   auth,
@@ -51,6 +51,9 @@ type ViewMode =
 const App: React.FC = () => {
   const NOTICE_KEY = "notice_api_fix_dismissed";
   const NOTICE_EXPIRY = new Date(2026, 5, 5).getTime();
+  const MAX_IMPORT_FILE_SIZE_BYTES = 2 * 1024 * 1024;
+  const MAX_IMPORT_WORDS = 2000;
+  const MAX_IMPORT_BOOKS = 100;
   const WORDS_PAGE_SIZE = 30;
   const INITIAL_VISIBLE_COUNT = 20;
   const VISIBLE_COUNT_STEP = 20;
@@ -73,6 +76,7 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<GeminiResponse[]>([]);
   const [searchFocus, setSearchFocus] = useState<SearchFocus>("all");
+  const [aiSpeedMode, setAiSpeedMode] = useState<AiSpeedMode>("fast");
   const [isSearching, setIsSearching] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showBooks, setShowBooks] = useState(false);
@@ -104,6 +108,99 @@ const App: React.FC = () => {
   const showToast = useCallback((message: string, type: any = "info") => {
     setToast({ message, type, isVisible: true });
   }, []);
+
+  const isPlainObject = useCallback((value: unknown): value is Record<string, any> => {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }, []);
+
+  const sanitizeImportText = useCallback((value: unknown, maxLength = 5000) => {
+    if (typeof value !== "string") return "";
+    return value.trim().slice(0, maxLength);
+  }, []);
+
+  const validateImportedWord = useCallback((value: unknown, index: number) => {
+    if (!isPlainObject(value)) {
+      throw new Error(`単語データ ${index + 1} 件目の形式が不正です。`);
+    }
+    const word = sanitizeImportText(value.word, 120);
+    const meaning = sanitizeImportText(value.meaning, 3000);
+    if (!word || !meaning) {
+      throw new Error(`単語データ ${index + 1} 件目に word / meaning がありません。`);
+    }
+    const status = ["unknown", "learning", "mastered"].includes(value.status)
+      ? value.status as WordStatus
+      : "unknown";
+    const timestamp = typeof value.timestamp === "number" && Number.isFinite(value.timestamp)
+      ? value.timestamp
+      : Date.now();
+    return {
+      id: typeof value.id === "string" && value.id.trim() ? value.id.trim().slice(0, 160) : crypto.randomUUID(),
+      bookId: typeof value.bookId === "string" && value.bookId.trim() ? value.bookId.trim().slice(0, 160) : "default",
+      word,
+      meaning,
+      pronunciation: sanitizeImportText(value.pronunciation, 500),
+      etymology: sanitizeImportText(value.etymology, 5000),
+      mnemonic: sanitizeImportText(value.mnemonic, 3000),
+      logic: sanitizeImportText(value.logic, 5000),
+      exampleSentence: sanitizeImportText(value.exampleSentence, 2000),
+      exampleSentenceTranslation: sanitizeImportText(value.exampleSentenceTranslation, 2000),
+      synonyms: Array.isArray(value.synonyms) ? value.synonyms.slice(0, 50) : [],
+      collocations: Array.isArray(value.collocations) ? value.collocations.slice(0, 50) : [],
+      derivatives: Array.isArray(value.derivatives) ? value.derivatives.filter((item: unknown) => typeof item === "string").slice(0, 80) : [],
+      idioms: Array.isArray(value.idioms) ? value.idioms.slice(0, 50) : [],
+      nuance: sanitizeImportText(value.nuance, 3000),
+      relatedWords: Array.isArray(value.relatedWords) ? value.relatedWords.slice(0, 50) : [],
+      timestamp,
+      status,
+      isTrashed: !!value.isTrashed,
+    } as WordEntry;
+  }, [isPlainObject, sanitizeImportText]);
+
+  const validateImportedBook = useCallback((value: unknown, index: number) => {
+    if (!isPlainObject(value)) {
+      throw new Error(`単語帳データ ${index + 1} 件目の形式が不正です。`);
+    }
+    const title = sanitizeImportText(value.title, 120);
+    if (!title) {
+      throw new Error(`単語帳データ ${index + 1} 件目に title がありません。`);
+    }
+    return {
+      id: typeof value.id === "string" && value.id.trim() ? value.id.trim().slice(0, 160) : crypto.randomUUID(),
+      title,
+      description: sanitizeImportText(value.description, 1000),
+      createdAt: typeof value.createdAt === "number" && Number.isFinite(value.createdAt)
+        ? value.createdAt
+        : Date.now(),
+      color: typeof value.color === "string" ? value.color.slice(0, 120) : undefined,
+    } as BookMetadata;
+  }, [isPlainObject, sanitizeImportText]);
+
+  const parseEtymolinguaImport = useCallback((raw: unknown) => {
+    const importedWordsRaw = Array.isArray(raw)
+      ? raw
+      : isPlainObject(raw) && Array.isArray(raw.words)
+        ? raw.words
+        : null;
+    const importedBooksRaw = isPlainObject(raw) && Array.isArray(raw.books) ? raw.books : [];
+
+    if (!importedWordsRaw) {
+      throw new Error("EtymolinguaのJSON形式ではありません。");
+    }
+    if (importedWordsRaw.length === 0) {
+      throw new Error(t(language, "app.noWordsImported"));
+    }
+    if (importedWordsRaw.length > MAX_IMPORT_WORDS) {
+      throw new Error(`一度に取り込める単語は${MAX_IMPORT_WORDS}語までです。`);
+    }
+    if (importedBooksRaw.length > MAX_IMPORT_BOOKS) {
+      throw new Error(`一度に取り込める単語帳は${MAX_IMPORT_BOOKS}件までです。`);
+    }
+
+    return {
+      words: importedWordsRaw.map(validateImportedWord),
+      books: importedBooksRaw.map(validateImportedBook),
+    };
+  }, [MAX_IMPORT_BOOKS, MAX_IMPORT_WORDS, isPlainObject, language, t, validateImportedBook, validateImportedWord]);
 
   const dismissNotice = useCallback(() => {
     try {
@@ -291,11 +388,35 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("currentUser.uid", currentUser?.uid || null);
       setUser(currentUser);
       loadData();
     });
     return () => unsubscribe();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsubscribe = dbService.subscribeUserData(user.uid, {
+      onBooks: (syncedBooks) => {
+        setBooks(syncedBooks);
+      },
+      onNotes: (syncedNotes) => {
+        setNotes(syncedNotes);
+      },
+      onWords: (syncedWords) => {
+        setWords(syncedWords);
+        setAllWordsCount(syncedWords.length);
+        setWordsCursor(null);
+        setHasMoreWords(false);
+        setIsWordsLoading(false);
+      },
+      onError: () => {
+        showToast("リアルタイム同期に失敗しました。通信状態を確認してください。", "error");
+      },
+    });
+    return () => unsubscribe();
+  }, [showToast, user?.uid]);
 
   useEffect(() => {
     const readRedirectResult = async () => {
@@ -405,7 +526,7 @@ const App: React.FC = () => {
       setSearchQuery(query);
       setIsSearching(true);
       try {
-        const result = await fetchWordDetails(query, { focus: searchFocus });
+        const result = await fetchWordDetails(query, { focus: searchFocus, aiSpeedMode });
         setSearchResults([result]);
       } catch (err: any) {
         showToast(err.message || t(language, "app.searchFailed"), "error");
@@ -413,7 +534,7 @@ const App: React.FC = () => {
         setIsSearching(false);
       }
     },
-    [language, searchFocus, showToast],
+    [aiSpeedMode, language, searchFocus, showToast],
   );
 
   const handleSearchSubmit = useCallback(async () => {
@@ -431,7 +552,7 @@ const App: React.FC = () => {
       const chunkResults = await Promise.all(
         chunk.map(async (query) => {
           try {
-            return await fetchWordDetails(query, { focus: searchFocus });
+            return await fetchWordDetails(query, { focus: searchFocus, aiSpeedMode });
           } catch (err: any) {
             showToast(`「${query}」: ${err.message || t(language, "app.searchFailed")}`, "error");
             return null;
@@ -442,7 +563,7 @@ const App: React.FC = () => {
     }
     setSearchResults(results);
     setIsSearching(false);
-  }, [INITIAL_SEARCH_RESULTS_VISIBLE, language, parseSearchQueries, searchFocus, searchQuery, showToast]);
+  }, [INITIAL_SEARCH_RESULTS_VISIBLE, aiSpeedMode, language, parseSearchQueries, searchFocus, searchQuery, showToast]);
 
   const handleStartDailyQuiz = useCallback((selectedWords: WordEntry[]) => {
     setQuizTargetWords(selectedWords);
@@ -565,30 +686,25 @@ const App: React.FC = () => {
     async (file: File) => {
       if (!ensureWritableSession()) return;
       try {
-        const text = await file.text();
-        const raw = JSON.parse(text);
-
-        const importedWords: WordEntry[] = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw.words)
-            ? raw.words
-            : [];
-        const importedBooks: BookMetadata[] = Array.isArray(raw.books)
-          ? raw.books
-          : [];
-
-        if (importedWords.length === 0) {
-          showToast(t(language, "app.noWordsImported"), "warning");
+        const isJsonFile =
+          file.name.toLowerCase().endsWith(".json") ||
+          file.type === "application/json" ||
+          file.type === "text/json";
+        if (!isJsonFile) {
+          showToast("JSONファイル（.json）のみ読み込めます。", "error");
           return;
         }
+        if (file.size > MAX_IMPORT_FILE_SIZE_BYTES) {
+          showToast("ファイルサイズが大きすぎます。2MB以下のJSONを選択してください。", "error");
+          return;
+        }
+        const text = await file.text();
+        const raw = JSON.parse(text);
+        const { words: importedWords, books: importedBooks } = parseEtymolinguaImport(raw);
 
         const normalizedWords = importedWords.map((w) => ({
           ...w,
-          id: w.id || crypto.randomUUID(),
           userId: user?.uid || "guest",
-          timestamp: w.timestamp || Date.now(),
-          status: w.status || "unknown",
-          isTrashed: !!w.isTrashed,
         }));
         const normalizedBooks = importedBooks.map((b: any) => ({
           ...b,
@@ -600,11 +716,19 @@ const App: React.FC = () => {
 
         await loadData();
         showToast(`インポート完了: ${normalizedWords.length} 語`, "success");
-      } catch (error) {
+      } catch (error: any) {
         showToast(getFirebaseErrorMessage(error), "error");
       }
     },
-    [ensureWritableSession, getFirebaseErrorMessage, loadData, showToast, user],
+    [
+      MAX_IMPORT_FILE_SIZE_BYTES,
+      ensureWritableSession,
+      getFirebaseErrorMessage,
+      loadData,
+      parseEtymolinguaImport,
+      showToast,
+      user,
+    ],
   );
 
   // 単語フィルタリング: "all" のときのみ全件（ゴミ箱除く）を対象にする
@@ -870,6 +994,114 @@ const App: React.FC = () => {
   if (isGlobalLoading)
     return <div className="p-20 text-center text-surface-700">{t(language, "app.loading")}</div>;
 
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-surface-50 text-surface-900">
+        <main>
+          <section className="px-5 py-10 md:px-8 md:py-14">
+            <div className="mx-auto max-w-5xl">
+              <div className="mb-8 flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-600 text-white shadow-md shadow-indigo-200">
+                  <i className="fa-solid fa-book-sparkles text-xl"></i>
+                </div>
+                <span className="text-lg font-black tracking-tight text-surface-900">Etymolingua</span>
+              </div>
+
+              <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+                <div className="space-y-6">
+                  <h1 className="text-4xl font-extrabold leading-tight text-surface-900 md:text-5xl">
+                    Etymolingua - 語源で学ぶ英語学習アプリ
+                  </h1>
+                  <p className="max-w-2xl text-lg leading-8 text-surface-700">
+                    Etymolinguaは、英単語を丸暗記ではなく、語源、接頭辞、語根、接尾辞から理解して覚えるための英語学習アプリです。
+                    単語の由来や意味のつながりを読み解くことで、知らない単語にも推測の手がかりを持てる語彙力を育てます。
+                  </p>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => setShowLogin(true)}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-600 px-6 py-4 text-sm font-bold text-white shadow-md shadow-indigo-200 transition-colors hover:bg-primary-500"
+                    >
+                      <i className="fa-solid fa-magnifying-glass"></i>
+                      今すぐ語源を検索する
+                    </button>
+                    <a
+                      href="#etymology-examples"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-surface-200 bg-white px-6 py-4 text-sm font-bold text-surface-700 transition-colors hover:border-primary-600 hover:text-primary-600"
+                    >
+                      <i className="fa-solid fa-seedling"></i>
+                      語源学習の例を見る
+                    </a>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-surface-200 bg-white p-6 shadow-xl shadow-slate-200/70">
+                  <p className="mb-4 text-sm font-bold text-primary-600">語源でつながる単語例</p>
+                  <div className="space-y-4">
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-xl font-extrabold text-surface-900">inspect</p>
+                      <p className="mt-2 text-sm leading-6 text-surface-700">
+                        in-（中へ）+ spect（見る）。「中をよく見る」から、調査する、点検するという意味につながります。
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-xl font-extrabold text-surface-900">perspective</p>
+                      <p className="mt-2 text-sm leading-6 text-surface-700">
+                        per-（通して）+ spect（見る）。物事を通して見る視点、見方という意味を理解できます。
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-xl font-extrabold text-surface-900">predict</p>
+                      <p className="mt-2 text-sm leading-6 text-surface-700">
+                        pre-（前もって）+ dict（言う）。前もって言うことから、予測するという意味になります。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="etymology-examples" className="border-y border-surface-200 bg-white px-5 py-10 md:px-8">
+            <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-3">
+              <div>
+                <h2 className="text-xl font-extrabold text-surface-900">Etymolinguaとは何か</h2>
+                <p className="mt-3 text-sm leading-7 text-surface-700">
+                  Etymolinguaは、英単語を構成するパーツに注目します。接頭辞の方向感、語根のコアイメージ、接尾辞の品詞や役割を組み合わせて、単語の意味を体系的に理解します。
+                </p>
+              </div>
+              <div>
+                <h2 className="text-xl font-extrabold text-surface-900">学習メリット</h2>
+                <p className="mt-3 text-sm leading-7 text-surface-700">
+                  語源を知ると、関連語をまとめて覚えやすくなります。inspect、respect、perspectiveのように共通語根を持つ単語を関連づけ、記憶に残りやすい単語帳を作れます。
+                </p>
+              </div>
+              <div>
+                <h2 className="text-xl font-extrabold text-surface-900">対象ユーザー</h2>
+                <p className="mt-3 text-sm leading-7 text-surface-700">
+                  英単語の丸暗記が苦手な学習者、TOEICや英検に向けて語彙を増やしたい人、技術英語やビジネス英語を語源から整理したい人に向いています。
+                </p>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <LoginConfirmModal
+          isOpen={showLogin}
+          onClose={() => setShowLogin(false)}
+          onPopupConfirm={handlePopupLogin}
+          onRedirectConfirm={handleRedirectLogin}
+        />
+        <Toast
+          message={toast.message}
+          isVisible={toast.isVisible}
+          type={toast.type}
+          onClose={() => setToast({ ...toast, isVisible: false })}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-surface-50 overflow-x-hidden">
       {showNotice && (
@@ -923,6 +1155,14 @@ const App: React.FC = () => {
           <section className="app-main-container">
         {currentView === "search" && (
           <div className="view-stack mobile-view-shell">
+            <div className="space-y-2">
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-surface-900">
+                Etymolingua - 語源で覚える英単語
+              </h1>
+              <p className="text-sm md:text-base text-surface-600">
+                語源や単語の背景を理解しながら、英語の語彙力を効率的に伸ばせる英語学習アプリです。
+              </p>
+            </div>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -960,6 +1200,27 @@ const App: React.FC = () => {
                     searchFocus === mode.key
                       ? "bg-primary-600 text-white border-primary-600"
                       : "bg-white text-surface-700 border-surface-200 hover:border-primary-300"
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-surface-500 font-bold">AI速度</span>
+              {([
+                { key: "fast", label: "Fast", title: "最速・軽量" },
+                { key: "standard", label: "Standard", title: "標準" },
+              ] as { key: AiSpeedMode; label: string; title: string }[]).map((mode) => (
+                <button
+                  key={mode.key}
+                  type="button"
+                  title={mode.title}
+                  onClick={() => setAiSpeedMode(mode.key)}
+                  className={`px-3 py-1.5 rounded-full border font-bold transition-colors ${
+                    aiSpeedMode === mode.key
+                      ? "bg-secondary-500 text-white border-secondary-500"
+                      : "bg-white text-surface-700 border-surface-200 hover:border-secondary-300"
                   }`}
                 >
                   {mode.label}
