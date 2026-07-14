@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://etymolingua-61e6d.web.app/sitemap.xml

@@ -47,6 +47,14 @@ body {
   overflow-x: hidden;
 }
 
+#seo-content {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 .font-display {
   font-family: var(--font-serif);
 }
