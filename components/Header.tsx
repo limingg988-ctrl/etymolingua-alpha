@@ -9,6 +9,7 @@ type ViewMode =
   | "notebook"
   | "thesaurus"
   | "quiz"
+  | "eikenSpeaking"
   | "trash";
 
 interface HeaderProps {
@@ -32,6 +33,7 @@ const NAV_ITEMS: { key: ViewMode; labelKey: string; icon: string }[] = [
   { key: "list", labelKey: "header.list", icon: "fa-solid fa-list-ul" },
   { key: "analytics", labelKey: "header.analytics", icon: "fa-solid fa-chart-simple" },
   { key: "quiz", labelKey: "header.quiz", icon: "fa-solid fa-layer-group" },
+  { key: "eikenSpeaking", labelKey: "header.eikenSpeaking", icon: "fa-solid fa-microphone-lines" },
   { key: "chat", labelKey: "header.chat", icon: "fa-solid fa-comments" },
   { key: "notebook", labelKey: "header.notebook", icon: "fa-solid fa-book-bookmark" },
   { key: "trash", labelKey: "header.trash", icon: "fa-solid fa-trash-can" },

@@ -17,6 +17,7 @@ import { LoginConfirmModal } from "./components/LoginConfirmModal";
 import { WordIntelligenceView } from "./components/WordIntelligenceView";
 import { AnalyticsView } from "./components/AnalyticsView";
 import { FeedbackModal, FeedbackCategory, FeedbackContext } from "./components/FeedbackModal";
+import { EikenSpeakingView } from "./components/eiken/EikenSpeakingView";
 import {
   WordEntry,
   NoteEntry,
@@ -46,6 +47,7 @@ type ViewMode =
   | "notebook"
   | "thesaurus"
   | "quiz"
+  | "eikenSpeaking"
   | "trash";
 
 const App: React.FC = () => {
@@ -1443,6 +1445,9 @@ const App: React.FC = () => {
             language={language}
             onReportIssue={(context) => openFeedback({ mode: currentView, ...context })}
           /></div>
+        )}
+        {currentView === "eikenSpeaking" && (
+          <div className="mobile-view-shell"><EikenSpeakingView /></div>
         )}
         {currentView === "trash" && (
           <TrashView
