@@ -2,14 +2,17 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { initializeApp } from "firebase-admin/app";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
+import { requireAuth } from "./gemini.js";
 import {
   buildEikenSpeakingUserPrompt,
   EIKEN_SPEAKING_MODEL,
   EIKEN_SPEAKING_SYSTEM_INSTRUCTION,
   EikenSpeakingEvaluationRequest,
-} from "../../shared/eikenSpeaking";
+} from "../../shared/eikenSpeaking.js";
 
 initializeApp();
+
+export { lookupWord, generateAiQuiz, chatWithTutor, generateNote } from "./gemini.js";
 
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 const ALLOWED_METHODS = "POST, OPTIONS";
@@ -72,6 +75,7 @@ export const evaluateEikenSpeaking = onRequest(
     }
 
     try {
+      await requireAuth(req);
       const payload = parseEvaluationRequest(req.body);
       const ai = createGenAI();
       const response = await ai.models.generateContent({

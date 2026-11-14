@@ -1,32 +1,38 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { GeminiResponse, ChatMessage, NoteEntry, WordEntry } from "../types";
-import { AppLanguage, getLanguageInstruction } from "./i18n";
+/**
+ * services/geminiService.ts
+ *
+ * Gemini 連携のクライアント側サービス。
+ *
+ * 【セキュリティ修正】以前はブラウザ埋め込みの API キーを使って直接
+ * Gemini API を呼び出していたが、API キーが JS バンドルに露出してしまうため、
+ * 呼び出しを Firebase Functions（lookupWord / generateAiQuiz /
+ * chatWithTutor / generateNote）経由に変更した。キーはサーバー側の
+ * Secret Manager にのみ存在する。
+ *
+ * 代償として、AI 機能はログイン必須になる（Functions 側で Firebase
+ * ID トークンを検証するため）。未ログイン時は functionsClient が
+ * ログインを促すエラーを投げる。
+ *
+ * 関数名・引数・戻り値・キャッシュ挙動・日本語エラーメッセージは
+ * 移設前と互換に保っている。
+ */
+import { GeminiResponse, ChatMessage, WordEntry } from "../types";
+import type { AppLanguage } from "./i18n";
+import { postToFunction } from "./functionsClient";
+import type {
+  ChatWithTutorResponse,
+  GenerateNoteResponse,
+  LookupWordRequest,
+} from "../shared/gemini";
+import type { ExplainMode, SearchFocus, AiSpeedMode } from "../shared/gemini";
 
-/** 英和・英英・多言語の説明モード */
-export type ExplainMode = "en-ja" | "en-en" | "multilingual";
-
-/** モードごとのAIへの専用命令（ベースの後に付与） */
-const EXPLAIN_MODE_SUFFIXES: Record<ExplainMode, string> = {
-  "en-ja":
-    "※ 出力言語: 日本語で語源を交えて説明してください。meaning, etymology, mnemonic, logic, exampleSentenceTranslation および synonyms/collocations/idioms/relatedWords の translation は全て日本語で記述してください。",
-  "en-en":
-    "※ Output language: Explain everything in simple English. All text fields (meaning, etymology, mnemonic, logic, exampleSentenceTranslation, and synonyms/collocations/idioms/relatedWords.translation) must be in English.",
-  multilingual:
-    "※ Output language: Use simple English as the primary language. You may add brief Japanese notes (in parentheses) for key etymology or memory hints when helpful.",
-};
-
-const getAI = () => {
-  // Use process.env.API_KEY exclusively as per guidelines
-  // Do not use localStorage or UI input for API key.
-  const apiKey = import.meta.env.VITE_API_KEY;
-  
-  if (!apiKey) {
-    throw new Error("API Key is not configured in the environment.");
-  }
-  return new GoogleGenAI({ apiKey });
-};
+export type { ExplainMode, SearchFocus, AiSpeedMode };
 
 const handleApiError = (error: any) => {
+  // 未ログイン（Functions の認証必須化に伴う専用エラー）はそのまま表示する
+  if ((error as any)?.code === "login-required") {
+    throw error;
+  }
   console.error("Gemini API Error:", error);
   
   // Extract error details
@@ -53,7 +59,7 @@ const handleApiError = (error: any) => {
   }
 
   // Check for Network errors
-  if (msg.includes("fetch failed") || msg.includes("network")) {
+  if (error instanceof TypeError || msg.includes("fetch failed") || msg.includes("network") || msg.includes("failed to fetch")) {
       throw new Error("ネットワーク接続エラーが発生しました。インターネット接続を確認してください。");
   }
   
@@ -65,56 +71,10 @@ const handleApiError = (error: any) => {
   throw new Error(`AIエラー: ${error.message || "不明なエラーが発生しました"}`);
 };
 
-/** ベースとなる共通のシステム命令（モードに依存しない部分） */
-const BASE_SYSTEM_INSTRUCTION = `あなたは世界一わかりやすい英語講師です。
-  ユーザーが入力した「英単語」または「熟語」について、以下の3点を軸に、**「なるほど！だからこういう意味になるのか！」と膝を打つような（アハ体験ができる）解説**を作成してください。
-
-  1. **語源・コアイメージ**: 単語をパーツ（接頭辞・語根・接尾辞）に分解し、それぞれの原義を可視化できるように説明する。熟語の場合は前置詞の持つ空間的イメージを強調する。
-  2. **論理（Logic）**: 「なぜその原義が、現在の意味になるのか？」という変遷のロジックを、飛躍なく、ストーリーとして納得感を持って繋げる。ここが最も重要です。「すっと頭に入る」説明を心がけてください。
-  3. **記憶のフック（Mnemonic）**: 思わず笑ってしまうような語呂合わせや、強烈な視覚イメージを喚起する覚え方を提案する。
-
-  重要：
-  - 専門用語を並べるのではなく、中学生でも直感的にわかる言葉選びをしてください。
-  - 熟語（句動詞）の場合は、直訳ではなく「核心のイメージ」から意味を導き出してください。
-
-  以下の要素を含むJSON形式で回答してください。
-  1. word
-  2. meaning
-  3. pronunciation
-  4. etymology
-  5. mnemonic
-  6. logic
-  7. exampleSentence
-  8. exampleSentenceTranslation
-  9. synonyms: [{ term, translation }]
-  10. collocations: [{ term, translation }]
-  11. derivatives: string[]
-  12. idioms: [{ term, translation }]
-  13. nuance
-  14. relatedWords: [{ term, translation }]
-
-  必ず純粋なJSONのみを返してください。`;
-
-export type SearchFocus = "all" | "idioms" | "etymology" | "core";
-export type AiSpeedMode = "fast" | "standard";
-
-const AI_MODEL_BY_SPEED: Record<AiSpeedMode, string> = {
-  fast: "gemini-2.5-flash-lite",
-  standard: "gemini-3-flash-preview",
-};
-
 const AI_CACHE_VERSION = "v1";
 const AI_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14;
 
-const SEARCH_FOCUS_SUFFIXES: Record<SearchFocus, string> = {
-  all: "",
-  idioms:
-    "※ 重点: idioms（熟語・句動詞）を最優先で充実させてください。idioms は最低5件を目安に具体的に出力し、logic でも句動詞イメージを丁寧に説明してください。",
-  etymology:
-    "※ 重点: etymology と logic を最も詳しくしてください。語源分解や意味変遷の説明を通常より厚く書いてください。",
-  core:
-    "※ 重点: meaning / nuance / exampleSentence を短く実用的に、初学者向けに簡潔にまとめてください。",
-};
+
 
 const aiCacheKey = (word: string, explainMode: ExplainMode, focus: SearchFocus, aiSpeedMode: AiSpeedMode) =>
   `ai-word-cache:${AI_CACHE_VERSION}:${aiSpeedMode}:${explainMode}:${focus}:${word.trim().toLowerCase()}`;
@@ -148,7 +108,6 @@ export const fetchWordDetails = async (
   word: string,
   options?: { explainMode?: ExplainMode; focus?: SearchFocus; aiSpeedMode?: AiSpeedMode },
 ): Promise<GeminiResponse> => {
-  const ai = getAI();
   const explainMode = options?.explainMode ?? "en-ja";
   const focus = options?.focus ?? "all";
   const aiSpeedMode = options?.aiSpeedMode ?? "fast";
@@ -157,98 +116,8 @@ export const fetchWordDetails = async (
   if (cached) return cached;
 
   try {
-    const response = await ai.models.generateContent({
-      model: AI_MODEL_BY_SPEED[aiSpeedMode],
-      contents: `次の英単語/熟語を解説してください: ${word}`,
-      config: {
-        systemInstruction: `${BASE_SYSTEM_INSTRUCTION}
-
-${EXPLAIN_MODE_SUFFIXES[explainMode]}
-${SEARCH_FOCUS_SUFFIXES[focus]}`,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            word: { type: Type.STRING },
-            meaning: { type: Type.STRING },
-            pronunciation: { type: Type.STRING },
-            etymology: { type: Type.STRING },
-            mnemonic: { type: Type.STRING },
-            logic: { type: Type.STRING },
-            exampleSentence: { type: Type.STRING },
-            exampleSentenceTranslation: { type: Type.STRING },
-            synonyms: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  term: { type: Type.STRING },
-                  translation: { type: Type.STRING },
-                },
-                required: ["term", "translation"],
-              },
-            },
-            collocations: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  term: { type: Type.STRING },
-                  translation: { type: Type.STRING },
-                },
-                required: ["term", "translation"],
-              },
-            },
-            derivatives: { type: Type.ARRAY, items: { type: Type.STRING } },
-            idioms: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  term: { type: Type.STRING },
-                  translation: { type: Type.STRING },
-                },
-                required: ["term", "translation"],
-              },
-            },
-            nuance: { type: Type.STRING },
-            relatedWords: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  term: { type: Type.STRING },
-                  translation: { type: Type.STRING },
-                },
-                required: ["term", "translation"],
-              },
-            },
-          },
-          required: [
-            "word",
-            "meaning",
-            "pronunciation",
-            "etymology",
-            "mnemonic",
-            "logic",
-            "exampleSentence",
-            "exampleSentenceTranslation",
-            "synonyms",
-            "collocations",
-            "derivatives",
-            "idioms",
-            "nuance",
-            "relatedWords",
-          ],
-        },
-      },
-    });
-
-    const text = response.text;
-    if (!text) throw new Error("AIからの応答が空でした。");
-
-    const cleanText = text.replace(/^```json\s*/, "").replace(/\s*```$/, "").trim();
-    const parsed = JSON.parse(cleanText);
+    const payload: LookupWordRequest = { word, explainMode, focus, aiSpeedMode };
+    const parsed = await postToFunction<GeminiResponse>("lookupWord", payload);
     writeCachedWordDetails(cacheKey, parsed);
     return parsed;
   } catch (error) {
@@ -258,63 +127,17 @@ ${SEARCH_FOCUS_SUFFIXES[focus]}`,
 };
 
 export const generateAiQuiz = async (level: string, count: number): Promise<WordEntry[]> => {
-  const ai = getAI();
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `英語レベル「${level}」に合わせて、学習すべき重要な英単語を${count}個選出し、詳細な学習データを作成してください。`,
-      config: {
-        systemInstruction: `あなたは英語教材作成のプロフェッショナルです。
-指定されたレベルに適した、学習効果の高い英単語を選定し、JSON形式のリストで出力してください。
-各単語について、学習者が「なるほど！」と直感的に理解できる（腹落ちする）解説を作成してください。
-
-特に以下の要素を重視してください：
-1. **語源・コアイメージ**: パーツ分解や原義の解説。
-2. **Logic（なぜその意味？）**: 原義から現在の意味への繋がりを論理的に説明。
-3. **覚え方**: 記憶に残る語呂合わせやイメージ。
-
-出力フォーマットは以下のJSON配列です。
-[
-  {
-    "word": "単語",
-    "meaning": "意味",
-    "pronunciation": "発音",
-    "etymology": "語源解説",
-    "mnemonic": "覚え方",
-    "logic": "論理的背景",
-    "exampleSentence": "例文",
-    "exampleSentenceTranslation": "例文訳",
-    "synonyms": [{"term": "類語", "translation": "訳"}],
-    "collocations": [{"term": "コロケーション", "translation": "訳"}],
-    "derivatives": ["派生語"],
-    "idioms": [{"term": "熟語", "translation": "訳"}],
-    "nuance": "ニュアンス",
-    "relatedWords": [{"term": "関連語", "translation": "訳"}]
-  }
-]`,
-        responseMimeType: "application/json",
-      },
-    });
-
-    const text = response.text;
-    if (!text) throw new Error("AIからの応答が空でした。");
-
-    try {
-      const cleanText = text.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
-      const data = JSON.parse(cleanText);
-      // Add required frontend fields
-      return data.map((item: any) => ({
-        ...item,
-        id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2),
-        bookId: 'ai-generated',
-        timestamp: Date.now(),
-        status: 'unknown',
-        isTrashed: false
-      }));
-    } catch (e) {
-      console.error("JSON parse error:", text);
-      throw new Error("クイズデータの解析に失敗しました。");
-    }
+    const data = await postToFunction<GeminiResponse[]>("generateAiQuiz", { level, count });
+    // Add required frontend fields
+    return data.map((item) => ({
+      ...item,
+      id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2),
+      bookId: 'ai-generated',
+      timestamp: Date.now(),
+      status: 'unknown' as const,
+      isTrashed: false
+    }));
   } catch (error) {
     handleApiError(error);
     throw error;
@@ -327,36 +150,14 @@ export const sendChatMessage = async (
   vocabularyContext: string = "",
   responseLanguage: AppLanguage = "ja",
 ): Promise<string> => {
-  const ai = getAI();
-  const systemInstruction = `あなたは親切で知識豊富な英語学習アシスタントです。
-ユーザーからの英単語、文法、ニュアンス、または英語学習全般に関する質問に答えてください。
-回答は簡潔かつ分かりやすく、学習者が「なるほど」と納得できるように心がけてください。
-単語の解説をする際は、語源やコアイメージ（Logic）を交えて、記憶に定着しやすいように説明してください。
-
-【ユーザーの学習データ】
-ユーザーは以下の単語を既に学習（または検索）しています。
-質問に答える際、可能であればこれらの単語を例に挙げたり、比較対象として使うことで、ユーザーの記憶の定着を助けてください。
-また、「私の単語帳からクイズを出して」や「保存した単語を使って例文を作って」といったリクエストにも応じてください。
-
-学習済み単語リスト:
-${vocabularyContext}
-
-必要に応じて、類義語のリストアップや例文の作成を行ってください。\n\n${getLanguageInstruction(responseLanguage)}`;
-
   try {
-    const chat = ai.chats.create({
-      model: "gemini-3-flash-preview",
-      config: {
-        systemInstruction: systemInstruction,
-      },
-      history: history.map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.text }]
-      }))
+    const result = await postToFunction<ChatWithTutorResponse>("chatWithTutor", {
+      history,
+      newMessage,
+      vocabularyContext,
+      responseLanguage,
     });
-
-    const result = await chat.sendMessage({ message: newMessage });
-    return result.text || "Failed to generate response.";
+    return result.text;
   } catch (error) {
     handleApiError(error);
     throw error;
@@ -367,57 +168,16 @@ export const generateNoteFromChat = async (
   chatHistory: ChatMessage[],
   responseLanguage: AppLanguage = "ja",
 ): Promise<{ title: string; content: string; tags: string[] }> => {
-  const ai = getAI();
-  
   const relevantHistory = chatHistory.slice(1);
   if (relevantHistory.length === 0) {
       throw new Error("要約する会話データがありません。");
   }
-  const conversationText = relevantHistory.map(msg => `${msg.role}: ${msg.text}`).join("\n");
-
-  const prompt = `以下の英語学習に関する会話ログを、ユーザーが後で復習するための「構造化された学習ノート」に変換してください。
-単なる会話の要約ではなく、会話の中で登場した「重要な英単語」「文法事項」「ニュアンスの違い」「例文」などを抽出し、教科書や参考書のように整理してください。
-
-【要件】
-1. タイトル: 会話のテーマを一言で表す魅力的なタイトル（例：「GoとComeの使い分け完全ガイド」）
-2. 本文 (Content): Markdown形式で記述してください。
-   - 見出し (#, ##) を使って構造化する。
-   - 重要なポイントは箇条書き (-) にする。
-   - 例文や単語は太字 (**) にする。
-   - 講師のアドバイスやTipsを含める。
-3. タグ: 検索しやすいキーワード（3つ〜5つ）。
-
-【会話ログ】
-${conversationText}\n\n${getLanguageInstruction(responseLanguage)}`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING, description: "ノートのタイトル" },
-            content: { type: Type.STRING, description: "Markdown形式の学習ノート本文" },
-            tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "関連タグ" }
-          },
-          required: ["title", "content", "tags"]
-        }
-      }
+    return await postToFunction<GenerateNoteResponse>("generateNote", {
+      chatHistory,
+      responseLanguage,
     });
-
-    const text = response.text;
-    if (!text) throw new Error("要約の生成に失敗しました。");
-    
-    try {
-      const cleanJson = text.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
-      return JSON.parse(cleanJson);
-    } catch (e) {
-      console.error("Note generation error:", text);
-      throw new Error("ノートの作成に失敗しました。もう一度お試しください。");
-    }
   } catch (error) {
     handleApiError(error);
     throw error;
