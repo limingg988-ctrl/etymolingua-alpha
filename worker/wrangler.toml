@@ -1,0 +1,13 @@
+# etymolingua-ai-proxy — Cloudflare Workers 版 AI プロキシ
+#
+# 注意: GEMINI_API_KEY はこのファイルには絶対に書かないこと。
+# ダッシュボードの Settings -> Variables and Secrets で Secret として登録するか、
+# CLI の `wrangler secret put GEMINI_API_KEY` で登録する。
+
+name = "etymolingua-ai-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-07-01"
+workers_dev = true
+
+[vars]
+FIREBASE_PROJECT_ID = "etymolingua-61e6d"

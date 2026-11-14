@@ -1,25 +1,28 @@
 import {
-  EikenSpeakingEvaluation,
-  EikenSpeakingEvaluationRequest,
+EikenSpeakingEvaluation,
+EikenSpeakingEvaluationRequest,
 } from "../../shared/eikenSpeaking";
+import { postToFunction} from "../functionsClient";
 
-const FUNCTIONS_ORIGIN =
-  import.meta.env.VITE_FIREBASE_FUNCTIONS_ORIGIN ||
-  "https://asia-northeast1-etymolingua-61e6d.cloudfunctions.net";
-
+/**
+* 英検スピーキング採点 API クライアント。
+*
+* Functions 側の evaluateEikenSpeaking が Firebase ID トークン
+* 必須になったため、fetch を functionsClient.postToFunction に置き換え、
+* Authorization: Bearer <ID token> を付与するようにした。
+* 未ログイン時は functionsClient がログインを促すエラーを投げる。
+*/
 export const evaluateEikenSpeaking = async (
-  payload: EikenSpeakingEvaluationRequest,
+payload: EikenSpeakingEvaluationRequest,
 ): Promise<EikenSpeakingEvaluation> => {
-  const response = await fetch(`${FUNCTIONS_ORIGIN}/evaluateEikenSpeaking`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.error || "採点に失敗しました。時間をおいて再試行してください。");
-  }
-
-  return response.json();
+try {
+return await postToFunction<EikenSpeakingEvaluation>(
+"evaluateEikenSpeaking",
+payload,
+);
+} catch (error: any) {
+throw new Error(
+error?.message || "採点に失敗しました。時間をおいて再試行してください。",
+);
+}
 };
